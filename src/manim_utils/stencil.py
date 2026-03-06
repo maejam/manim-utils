@@ -20,8 +20,8 @@ class Stencil(m.VMobject):
         the stencil will adapt to the wrapped Mobject through a manim updater.
         If ``None`` (default), the stencil shape will remain unchanged. It is also
         possible to set this parameter to ``None`` and attach a custom updater to the
-        stencil. For permormance reasons, it is advised to set set ``wrapped`` to
-        ``None`` if the geometry and position of the covered mobject remains fixed.
+        stencil. For permormance reasons, it is advised to set ``wrapped`` to
+        ``None`` if the geometry and position of the covered mobject remain fixed.
     **kwargs
         Additional arguments passed to ``m.VMobject.__init__``. If not specified, the
         ``fill_color`` will default to the scene background color, and the
@@ -44,6 +44,7 @@ class Stencil(m.VMobject):
         self._clip = clip or m.VMobject()
         self._bool_op = bool_op
         self._wrapped = wrapped
+        self.add(self._clip)
 
         self._make_stencil()
         if self._wrapped:
