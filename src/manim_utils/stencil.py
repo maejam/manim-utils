@@ -44,6 +44,7 @@ class Stencil(m.VMobject):
         self._clip = clip or m.VMobject()
         self._bool_op = bool_op
         self._wrapped = wrapped
+        self._static_clip = False
         self.add(self._clip)
 
         self._make_stencil()
@@ -110,3 +111,13 @@ class Stencil(m.VMobject):
         else:
             self.add_updater(self._adapt_stencil)
         self._make_stencil()
+
+    @property
+    def is_clip_static(self) -> bool:
+        """Whether the clip should move with the stencil or not."""
+        return self._static_clip
+
+    @is_clip_static.setter
+    def is_clip_static(self, is_static: bool) -> None:
+        self._static_clip = is_static
+        self.remove(self._clip) if is_static else self.add(self._clip)
