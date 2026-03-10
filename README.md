@@ -5,6 +5,7 @@
 - [Installation](#installation)
 - [Utilities](#utilities)
   - [Stencil](#stencil)
+  - [code](#code)
 
 ---
 
@@ -69,3 +70,13 @@ class StencilDemo(Scene):
         )
         self.wait(1)
 ```
+
+### Code
+
+A set of utilities to manipulate code within your manim scenes. This is designed to be more flexible and lightweight than the manim `Code` Mobject.
+
+It provides 2 functions:
+* `highlight_code`: returns an object with 2 attributes, the highlighted lines of code and the background color.
+* `get_styles_list`: returns the list of available `pygments` styles.
+
+See the docstrings in `manim_utils.code` for more details.
