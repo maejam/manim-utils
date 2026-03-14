@@ -49,7 +49,7 @@ class Stencil(m.VMobject):
 
         self._make_stencil()
         if self._wrapped:
-            self.add_updater(self._adapt_stencil)
+            self.add_updater(self._adapt_stencil, call_updater=True)
 
     def _make_stencil(self) -> None:
         """Recompute the stencil geometry."""
