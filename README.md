@@ -6,6 +6,7 @@
 - [Utilities](#utilities)
   - [Stencil](#stencil)
   - [code](#code)
+  - [animations](#animations)
 
 ---
 
@@ -69,14 +70,75 @@ class StencilDemo(Scene):
             rate_func=there_and_back,
         )
         self.wait(1)
-```
+```  
 
-### Code
+See the docstrings in `manim_utils.stencil` for more details.  
 
-A set of utilities to manipulate code within your manim scenes. This is designed to be more flexible and lightweight than the manim `Code` Mobject.
+
+### Code  
+
+A set of utilities to manipulate code within your manim scenes. This is designed to be more flexible and lightweight than the manim `Code` Mobject. Can be used with [Paragraph](https://docs.manim.community/en/stable/reference/manim.mobject.text.text_mobject.Paragraph.html), [Table](https://docs.manim.community/en/stable/reference/manim.mobject.table.Table.html) or [manim-grid](https://github.com/maejam/manim-grid) for instance.
 
 It provides 2 functions:
 * `highlight_code`: returns an object with 2 attributes, the highlighted lines of code and the background color.
-* `get_styles_list`: returns the list of available `pygments` styles.
+* `get_styles_list`: returns the list of available `pygments` styles.  
 
-See the docstrings in `manim_utils.code` for more details.
+See the docstrings in `manim_utils.code` for more details.  
+
+
+### Animations  
+
+Utilities related to animations.
+* `LazyAnimation`: an Animation wrapper that builds the animation only when it is played. Useful when the set of mobjects to animate or the animation parameters may change dynamically between the moment the animation is built and the moment it is played.
+
+```python
+
+from manim import *
+from manim_utils import LazyAnimation
+
+
+class LazyAnimationScene(Scene):
+    def construct(self) -> None:
+        grp = VGroup(Circle(color=RED), Dot(color=GREEN), Rectangle(color=BLUE))
+        self.add(grp.arrange(RIGHT))
+
+        def mob_factory():
+            return VGroup([mob for mob in grp if mob.color == RED])
+
+        anim = LazyAnimation(
+            mobject_factory=mob_factory,
+            animation_factory=lambda mob: ApplyMethod(mob.shift, RIGHT * 3),
+        )
+
+        # even mobjects that are changed after the animation is built will be
+        # included
+        grp[2].set_color(RED)
+        self.play(anim, run_time=2)
+
+```  
+
+* `TrackedAnimation`: an Animation subclass that tracks wether the animation has already been played or not.
+
+```python
+
+from manim import *
+from manim_utils import TrackedAnimation
+
+
+class TrackedAnimationScene(Scene):
+    def construct(self) -> None:
+        c = Circle()
+
+        # .animate methods can be wrapped in ApplyMethod
+        anim = TrackedAnimation(ApplyMethod(c.shift, RIGHT * 3), run_time=2)
+        print(anim._played)  # False
+        self.play(anim)
+        print(anim._played)  # True
+
+        # Animation classes can be used directly
+        anim2 = TrackedAnimation(Transform(c, Rectangle()))
+        print(anim2._played)  # False
+        self.play(anim2)
+        print(anim2._played)  # True
+
+```
