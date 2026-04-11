@@ -117,28 +117,44 @@ class LazyAnimationScene(Scene):
 
 ```  
 
-* `TrackedAnimation`: an Animation subclass that tracks wether the animation has already been played or not.
+* `TrackedAnimationMixin`: an Mixin class for `Animation` that tracks the status of the animation: "not played", "playing" and "played".
+Make sure the Mixin comes before the Animation class in the inheritance tree.
+
 
 ```python
 
 from manim import *
-from manim_utils import TrackedAnimation
+from manim_utils import TrackedAnimationMixin
 
 
 class TrackedAnimationScene(Scene):
     def construct(self) -> None:
         c = Circle()
 
-        # .animate methods can be wrapped in ApplyMethod
-        anim = TrackedAnimation(ApplyMethod(c.shift, RIGHT * 3), run_time=2)
-        print(anim._played)  # False
-        self.play(anim)
-        print(anim._played)  # True
-
         # Animation classes can be used directly
-        anim2 = TrackedAnimation(Transform(c, Rectangle()))
-        print(anim2._played)  # False
+        class TrackedTransform(TrackedAnimationMixin, Transform): ...
+
+        anim = TrackedTransform(c, Rectangle(), run_time=2)
+
+        status_text = Text("").to_edge(DOWN)
+        self.add(status_text)
+
+        def update_status(mob, dt):
+            if hasattr(anim, "_status"):
+                mob.become(Text(anim._status).to_edge(DOWN))
+
+        status_text.add_updater(update_status)
+
+        self.wait()
+        self.play(anim)
+
+        # .animate methods can be wrapped in ApplyMethod
+        class TrackedApplyMethod(TrackedAnimationMixin, ApplyMethod): ...
+
+        anim2 = TrackedApplyMethod(c.shift, RIGHT * 3)
+        print(anim2._status)
+
         self.play(anim2)
-        print(anim2._played)  # True
+        print(anim2._status)
 
 ```

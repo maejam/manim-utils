@@ -1,182 +1,162 @@
 import manim as m
 import numpy as np
+import pytest
 
-from manim_utils.animations import LazyAnimation, TrackedAnimation
+from manim_utils import LazyAnimation, TrackedAnimationMixin
 
 
 # ----------------------------------------------------------------------
 # Setup
 # ----------------------------------------------------------------------
-def create_red_circle():
-    return m.Circle(color=m.RED)
+def circle_factory():
+    return m.Circle()
 
 
-def create_green_square():
-    return m.Square(color=m.GREEN)
+def applymeth_factory(mob):
+    return m.ApplyMethod(mob.shift, m.RIGHT)
 
 
-def shift_right_anim(mob: m.Mobject, distance: float = 1.0):
-    return m.ApplyMethod(mob.shift, m.RIGHT * distance)
+@pytest.fixture
+def tracked_transform():
+    class TrackedTransform(TrackedAnimationMixin, m.Transform): ...
+
+    return TrackedTransform(m.Circle(), m.Rectangle())
+
+
+@pytest.fixture
+def tracked_apply_meth():
+    class TrackedAppplyMeth(TrackedAnimationMixin, m.ApplyMethod): ...
+
+    return TrackedAppplyMeth(m.Circle().shift, m.RIGHT)
 
 
 # ----------------------------------------------------------------------
 # LazyAnimation
 # ----------------------------------------------------------------------
-def test_mobject_deferred_until_begin():
-    called = False
-
-    def factory():
-        nonlocal called
-        called = True
-        return m.Circle()
-
+def test_lazy_animation_instantiation():
     anim = LazyAnimation(
-        mobject_factory=factory, animation_factory=lambda mob: m.FadeIn(mob)
+        mobject_factory=circle_factory,
+        animation_factory=applymeth_factory,
     )
 
-    assert not called, "Factory should not be called in __init__"
+    assert anim is not None
+    assert anim._mobject_factory is circle_factory
+    assert anim._animation_factory is applymeth_factory
 
-    anim.begin()
-    assert called, "Factory must be called in begin()"
 
-
-def test_kwargs_deferred_until_begin():
-    called = False
-
-    def kwargs_factory():
-        nonlocal called
-        called = True
-        return {"distance": 5.0}
-
+def test_mobject_assigned_after_begin():
     anim = LazyAnimation(
-        mobject_factory=create_red_circle,
-        animation_factory=shift_right_anim,
-        kwargs_factory=kwargs_factory,
+        mobject_factory=circle_factory,
+        animation_factory=applymeth_factory,
     )
 
-    assert not called, "Kwargs factory should not be called in __init__"
+    assert isinstance(anim.mobject, m.Mobject)
+    assert not isinstance(anim.mobject, m.Circle)
+    anim.begin()
+    assert isinstance(anim.mobject, m.Circle)
+
+
+def test_delegation_to_inner_animation():
+    anim = LazyAnimation(
+        mobject_factory=circle_factory,
+        animation_factory=applymeth_factory,
+    )
 
     anim.begin()
-    assert called, "Kwargs factory must be called in begin()"
+
+    # These should not raise AttributeError
+    anim.interpolate(0.5)
+    anim.update_mobjects(0.016)
+    families = anim.get_all_families_zipped()
+    assert isinstance(families, zip)
 
 
-def test_captures_state_changes_before_begin():
+def test_finish_delegates_to_inner_animation():
+    anim = LazyAnimation(
+        mobject_factory=circle_factory,
+        animation_factory=applymeth_factory,
+    )
+
+    anim.begin()
+    # Should not raise
+    anim.finish()
+
+
+def test_dynamic_mobject_changes_are_captured():
+    """Test that mobject changes before play are captured."""
     c = m.Circle(color=m.RED)
     d = m.Dot(color=m.GREEN)
-    r = m.Rectangle(color=m.BLUE)
-
-    grp = m.VGroup(c, d, r)
-    assert np.allclose(c.get_center(), d.get_center(), r.get_center())
+    grp = m.VGroup(c, d)
 
     def mob_factory():
         return m.VGroup([mob for mob in grp if mob.color == m.RED])
 
     anim = LazyAnimation(
         mobject_factory=mob_factory,
-        animation_factory=lambda mob: m.ApplyMethod(mob.shift, m.RIGHT * 3),
-    )
-    grp[2].set_color(m.RED)
-    scene = m.Scene()
-    scene.play(anim)
-    assert np.allclose(c.get_center(), r.get_center())
-    assert not np.allclose(c.get_center(), d.get_center())
-
-
-def test_default_kwargs_factory():
-    anim = LazyAnimation(
-        mobject_factory=create_red_circle, animation_factory=lambda mob: m.FadeIn(mob)
+        animation_factory=applymeth_factory,
     )
 
-    anim.begin()
-    assert anim._kwargs == {}
+    grp[1].set_color(m.RED)
 
+    s = m.Scene()
+    pos_c = c.get_center()
+    pos_d = d.get_center()
+    s.play(anim)
 
-def test_interpolation_delegation():
-    """Verify interpolate delegates to the inner animation."""
-    anim = LazyAnimation(
-        mobject_factory=create_red_circle, animation_factory=lambda mob: m.FadeIn(mob)
-    )
-
-    anim.begin()
-    anim.interpolate(0.5)
-    # If we got here without error, delegation worked
-    assert anim._animation is not None
-
-
-def test_finish_delegation():
-    """Verify finish delegates to the inner animation."""
-    anim = LazyAnimation(
-        mobject_factory=create_red_circle, animation_factory=lambda mob: m.FadeIn(mob)
-    )
-
-    anim.begin()
-    anim.finish()
-
-    # Check that the inner animation finished
-    assert anim._animation is not None
-
-
-def test_get_all_families_zipped_delegation():
-    """Verify get_all_families_zipped delegates correctly."""
-    anim = LazyAnimation(
-        mobject_factory=create_red_circle, animation_factory=lambda mob: m.FadeIn(mob)
-    )
-
-    anim.begin()
-    families = anim.get_all_families_zipped()
-
-    assert families is not None
+    assert len(anim.mobject) == 2
+    assert not np.allclose(pos_c, c.get_center())
+    assert not np.allclose(pos_d, d.get_center())
 
 
 # ----------------------------------------------------------------------
-# TrackedAnimation
+# TrackedAnimationMixin
 # ----------------------------------------------------------------------
-def test_tracked_initial_played_state():
-    """Verify _played is False initially."""
-    anim = TrackedAnimation(shift_right_anim(m.Circle()))
-    assert anim._played is False
+def test_tracked_mixin_initial_status(tracked_transform, tracked_apply_meth):
+    assert tracked_transform._status == "not played"
+    assert tracked_apply_meth._status == "not played"
 
 
-def test_tracked_played_state_after_finish():
-    """Verify _played becomes True after finish()."""
-    anim = TrackedAnimation(shift_right_anim(m.Circle()))
-
-    # Manually call begin to simulate start
-    anim.begin()
-
-    assert anim._played is False
-
-    anim.finish()
-
-    assert anim._played is True
+def test_tracked_mixin_status_after_begin(tracked_transform, tracked_apply_meth):
+    tracked_transform.begin()
+    assert tracked_transform._status == "playing"
+    tracked_apply_meth.begin()
+    assert tracked_apply_meth._status == "playing"
 
 
-def test_tracked_played_state_persistence():
-    """Verify _played remains True after multiple finishes."""
-    anim = TrackedAnimation(shift_right_anim(m.Circle()))
-    anim.begin()
-    anim.finish()
-
-    assert anim._played is True
-
-    anim.finish()
-    assert anim._played is True
+def test_tracked_mixin_status_after_finish(tracked_transform, tracked_apply_meth):
+    tracked_transform.begin()
+    tracked_transform.finish()
+    assert tracked_transform._status == "played"
+    tracked_apply_meth.begin()
+    tracked_apply_meth.finish()
+    assert tracked_apply_meth._status == "played"
 
 
-def test_tracked_combined_with_lazy_animation():
-    def tracked_factory(mob: m.Mobject):
-        return TrackedAnimation(shift_right_anim(m.Circle()))
+def test_tracked_mixin_multiple_begin_finish_cycles(
+    tracked_transform, tracked_apply_meth
+):
+    # First cycle
+    assert tracked_transform._status == "not played"
+    tracked_transform.begin()
+    assert tracked_transform._status == "playing"
+    tracked_transform.finish()
+    assert tracked_transform._status == "played"
 
-    anim = LazyAnimation(
-        mobject_factory=create_red_circle, animation_factory=tracked_factory
-    )
-    print(anim.run_time)
+    # Second cycle
+    tracked_transform.begin()
+    assert tracked_transform._status == "playing"
+    tracked_transform.finish()
+    assert tracked_transform._status == "played"
 
-    anim.begin()
+    # First cycle
+    assert tracked_apply_meth._status == "not played"
+    tracked_apply_meth.begin()
+    assert tracked_apply_meth._status == "playing"
+    tracked_apply_meth.finish()
+    assert tracked_apply_meth._status == "played"
 
-    assert isinstance(anim._animation, TrackedAnimation)
-    assert anim._played is False
-
-    anim.finish()
-
-    assert anim._played is True
+    # Second cycle
+    tracked_apply_meth.begin()
+    assert tracked_apply_meth._status == "playing"
+    tracked_apply_meth.finish()
+    assert tracked_apply_meth._status == "played"
