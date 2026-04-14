@@ -111,52 +111,89 @@ def test_dynamic_mobject_changes_are_captured():
 # ----------------------------------------------------------------------
 # TrackedAnimationMixin
 # ----------------------------------------------------------------------
-def test_tracked_mixin_initial_status(tracked_transform, tracked_apply_meth):
-    assert tracked_transform._status == "not played"
-    assert tracked_apply_meth._status == "not played"
+def test_tracked_mixin_initialstatus(tracked_transform, tracked_apply_meth):
+    assert tracked_transform.status == "not played"
+    assert tracked_apply_meth.status == "not played"
 
 
-def test_tracked_mixin_status_after_begin(tracked_transform, tracked_apply_meth):
+def test_tracked_mixinstatus_after_begin(tracked_transform, tracked_apply_meth):
     tracked_transform.begin()
-    assert tracked_transform._status == "playing"
+    assert tracked_transform.status == "playing"
     tracked_apply_meth.begin()
-    assert tracked_apply_meth._status == "playing"
+    assert tracked_apply_meth.status == "playing"
 
 
-def test_tracked_mixin_status_after_finish(tracked_transform, tracked_apply_meth):
+def test_tracked_mixinstatus_after_finish(tracked_transform, tracked_apply_meth):
     tracked_transform.begin()
     tracked_transform.finish()
-    assert tracked_transform._status == "played"
+    assert tracked_transform.status == "played"
     tracked_apply_meth.begin()
     tracked_apply_meth.finish()
-    assert tracked_apply_meth._status == "played"
+    assert tracked_apply_meth.status == "played"
 
 
 def test_tracked_mixin_multiple_begin_finish_cycles(
     tracked_transform, tracked_apply_meth
 ):
     # First cycle
-    assert tracked_transform._status == "not played"
+    assert tracked_transform.status == "not played"
     tracked_transform.begin()
-    assert tracked_transform._status == "playing"
+    assert tracked_transform.status == "playing"
     tracked_transform.finish()
-    assert tracked_transform._status == "played"
+    assert tracked_transform.status == "played"
 
     # Second cycle
     tracked_transform.begin()
-    assert tracked_transform._status == "playing"
+    assert tracked_transform.status == "playing"
     tracked_transform.finish()
-    assert tracked_transform._status == "played"
+    assert tracked_transform.status == "played"
 
     # First cycle
-    assert tracked_apply_meth._status == "not played"
+    assert tracked_apply_meth.status == "not played"
     tracked_apply_meth.begin()
-    assert tracked_apply_meth._status == "playing"
+    assert tracked_apply_meth.status == "playing"
     tracked_apply_meth.finish()
-    assert tracked_apply_meth._status == "played"
+    assert tracked_apply_meth.status == "played"
 
     # Second cycle
     tracked_apply_meth.begin()
-    assert tracked_apply_meth._status == "playing"
+    assert tracked_apply_meth.status == "playing"
     tracked_apply_meth.finish()
-    assert tracked_apply_meth._status == "played"
+    assert tracked_apply_meth.status == "played"
+
+
+def test_tracked_mixin_tracker(tracked_transform, tracked_apply_meth):
+    t1 = m.ValueTracker()
+    t2 = m.ValueTracker()
+    tracked_transform.alpha_tracker = t1
+    tracked_apply_meth.alpha_tracker = t2
+
+    # First cycle
+    assert t1.get_value() == 0.0
+    tracked_transform.begin()
+    for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        tracked_transform.interpolate(alpha)
+        assert t1.get_value() == alpha
+    assert t1.get_value() == 1.0
+
+    # Second cycle
+    tracked_transform.begin()
+    for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        tracked_transform.interpolate(alpha)
+        assert t1.get_value() == alpha
+    assert t1.get_value() == 1.0
+
+    # First cycle
+    assert t2.get_value() == 0.0
+    tracked_apply_meth.begin()
+    for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        tracked_apply_meth.interpolate(alpha)
+        assert t2.get_value() == alpha
+    assert t2.get_value() == 1.0
+
+    # Second cycle
+    tracked_apply_meth.begin()
+    for alpha in [0.0, 0.25, 0.5, 0.75, 1.0]:
+        tracked_apply_meth.interpolate(alpha)
+        assert t2.get_value() == alpha
+    assert t2.get_value() == 1.0

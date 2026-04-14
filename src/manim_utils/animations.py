@@ -99,7 +99,6 @@ class TrackedAnimationMixin:
     >>> from manim import *
     >>> from manim_utils import TrackedAnimationMixin
 
-
     >>> class TrackedAnimationScene(Scene):
     >>>     def construct(self) -> None:
     >>>         c = Circle()
@@ -107,38 +106,62 @@ class TrackedAnimationMixin:
     >>>         # Animation classes can be used directly
     >>>         class TrackedTransform(TrackedAnimationMixin, Transform): ...
 
-    >>>         anim = TrackedTransform(c, Rectangle(), run_time=2)
-    >>>         status_text = Text("").to_edge(DOWN)
-    >>>         self.add(status_text)
+    >>>         tracker = ValueTracker()
+    >>>         anim = TrackedTransform(
+    >>>             c,
+    >>>             Rectangle(),
+    >>>             alpha_tracker=tracker,
+    >>>             run_time=2,
+    >>>         )
 
-    >>>         def update_status(mob, dt):
-    >>>             if hasattr(anim, "_status"):
-    >>>                 mob.become(Text(anim._status).to_edge(DOWN))
-
-    >>>         status_text.add_updater(update_status)
-
+    >>>         status_text = always_redraw(
+    >>>             lambda: Text(f"status: {anim.status}").to_edge(DOWN)
+    >>>         )
+    >>>         alpha_text = always_redraw(
+    >>>             lambda: Text(f"tracker: {tracker.get_value():.2f}")
+    >>>                 .next_to(status_text, UP)
+    >>>         )
+    >>>         self.add(status_text, alpha_text)
     >>>         self.wait()
     >>>         self.play(anim)
 
     >>>         # .animate methods can be wrapped in ApplyMethod
     >>>         class TrackedApplyMethod(TrackedAnimationMixin, ApplyMethod): ...
 
+    >>>         # the tracker is optional
     >>>         anim2 = TrackedApplyMethod(c.shift, RIGHT * 3)
-    >>>         print(anim2._status)
+    >>>         print(anim2.status)
+    'not played'
 
     >>>         self.play(anim2)
-    >>>         print(anim2._status)
+    >>>         print(anim2.status)
+    'played'
 
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        alpha_tracker: m.ValueTracker | None = None,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
-        self._status = "not played"
+        self.status = "not played"
+        self.alpha_tracker = alpha_tracker
 
     def begin(self) -> None:
-        self._status = "playing"
         super().begin()  # type: ignore[misc]
+        self.status = "playing"
+        if self.alpha_tracker is not None:
+            self.alpha_tracker.set_value(0.0)
 
     def finish(self) -> None:
         super().finish()  # type: ignore[misc]
-        self._status = "played"
+        if self.alpha_tracker is not None:
+            self.alpha_tracker.set_value(1.0)
+        self.status = "played"
+
+    def interpolate(self, alpha: float) -> None:
+        super().interpolate(alpha)  # type: ignore[misc]
+        if self.alpha_tracker is not None:
+            self.alpha_tracker.set_value(alpha)
