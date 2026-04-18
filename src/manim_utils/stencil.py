@@ -57,9 +57,7 @@ class Stencil(m.VMobject):
             self._shape,
             self._clip,
         )
-        self.clear_points()
-        if len(stencil.points) > 0:
-            self.set_points(stencil.points)
+        self.match_points(stencil)
 
     def _adapt_stencil(self, mob: m.Mobject, dt: float) -> None:
         """Keep the stencil aligned with the wrapped Mobject."""
