@@ -7,6 +7,8 @@
   - [Stencil](#stencil)
   - [code](#code)
   - [animations](#animations)
+  - [ui](#ui)
+    - [Buttons](#Buttons)
 
 ---
 
@@ -158,3 +160,71 @@ class TrackedAnimationScene(Scene):
         print(anim2._status)
 
 ```
+
+### UI  
+
+Pre-made UI elements that can be added to scenes and customized.  
+
+#### Buttons  
+
+All buttons have a `transition` method that changes the state of the button to the next one in the order they are defined. It is also possible to pass a string name to transition to a specific state: `transition("PUSHED")`.
+It is also possible to pass a callback parameter to a Button that will be called when a transition occurs. This callback takes 3 inputs: the button instance/the state name before the transition/the state name after the transition.
+
+* `PushButton`: a 2-states button ("PUSHED"/"UNPUSHED") with a bevel effect
+
+```python
+
+from manim import *
+from manim.utils.rate_functions import ease_in_back, ease_out_back
+
+from manim_utils.ui.buttons import PushButton
+
+
+class PushButtonDemo(Scene):
+    def construct(self):
+        d = Dot(color=GREEN)
+        self.add(d)
+
+        # the shape for the button
+        base_shape = RoundedRectangle(
+            corner_radius=0.3,
+            width=3.0,
+            height=1.5,
+            fill_color=TEAL_E,
+            fill_opacity=1,
+            stroke_width=0,
+        )
+
+        def callback(button, state_from, state_to):
+            if state_to == "PUSHED":
+                d.set_color(RED)
+            else:
+                d.set_color(GREEN)
+
+        button = PushButton(
+            shape=base_shape,
+            callback=callback,
+            contents={
+                "UNPUSHED": Text("Push Me"),
+                "PUSHED": Text("Pushed!", fill_opacity=0.2),
+            },
+        )
+        # customize any state value - will be updated after a transition
+        button.states["UNPUSHED"]["shadow_opacity"] = 1.0
+        r = BackgroundRectangle(button, fill_color=RED, buff=0.4)
+        Group(r, button).to_edge(DOWN)
+
+        self.add(r, button)
+        self.wait()
+        for _ in range(3):
+            rate_func = ease_in_back if button.state == "UNPUSHED" else ease_out_back
+            self.play(
+                button.animate(rate_func=rate_func).transition(),
+                run_time=0.5,
+            )
+            button.swap_content()
+            self.wait()
+
+```
+
+* `HighlightButton`: a 2-states flat button ("INACTIVE"/"ACTIVE") with an highlighting effect.
