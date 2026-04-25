@@ -79,7 +79,7 @@ See the docstrings in `manim_utils.stencil` for more details.
 
 ### Code  
 
-A set of utilities to manipulate code within your manim scenes. This is designed to be more flexible and lightweight than the manim `Code` Mobject. Can be used with [Paragraph](https://docs.manim.community/en/stable/reference/manim.mobject.text.text_mobject.Paragraph.html), [Table](https://docs.manim.community/en/stable/reference/manim.mobject.table.Table.html) or [manim-grid](https://github.com/maejam/manim-grid) for instance.
+A set of utilities to manipulate code in your manim scenes. This is designed to be more flexible and lightweight than the manim `Code` Mobject. Can be used with [Paragraph](https://docs.manim.community/en/stable/reference/manim.mobject.text.text_mobject.Paragraph.html), [Table](https://docs.manim.community/en/stable/reference/manim.mobject.table.Table.html) or [manim-grid](https://github.com/maejam/manim-grid) for instance.
 
 It provides 2 functions:
 * `highlight_code`: returns an object with 2 attributes, the highlighted lines of code and the background color.
@@ -228,3 +228,52 @@ class PushButtonDemo(Scene):
 ```
 
 * `HighlightButton`: a 2-states flat button ("INACTIVE"/"ACTIVE") with an highlighting effect.
+
+* `ButtonGroup`: a VGroup of Buttons with a group level callback function. This allows to have buttons react to transition on other buttons in the same group.
+
+```python
+
+from manim import *
+from manim.utils.rate_functions import ease_in_back, ease_out_back
+
+from manim_utils.ui.buttons import ButtonGroup, HighlightButton, PushButton
+
+
+class ButtonGroupDemo(Scene):
+    def construct(self):
+        # the shape for the button
+        base_shape = RoundedRectangle(
+            corner_radius=0.3,
+            width=3.0,
+            height=1.5,
+            fill_color=TEAL_E,
+            fill_opacity=1,
+            stroke_width=0,
+        )
+
+        def callback(group, button, state_from, state_to):
+            if state_to == "ACTIVE":
+                for btn in group:
+                    if btn is not button:
+                        btn.transition("INACTIVE")
+
+        tab1 = HighlightButton(shape=base_shape, contents=Text("Tab1"))
+        tab2 = HighlightButton(shape=base_shape, contents=Text("Tab2"))
+        tab3 = HighlightButton(shape=base_shape, contents=Text("Tab3"))
+        tabs = ButtonGroup(tab1, tab2, tab3, callback=callback)
+        tabs.arrange(RIGHT)
+        self.add(tabs)
+
+        self.wait()
+        tab1.transition("ACTIVE")
+        self.wait()
+        tab2.transition("ACTIVE")
+        self.wait()
+        tab3.transition("ACTIVE")
+        self.wait()
+        tab2.transition()
+        self.wait()
+
+```
+
+
