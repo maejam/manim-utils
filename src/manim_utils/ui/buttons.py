@@ -187,6 +187,69 @@ class Button(m.VGroup, ABC):
         return templates
 
 
+class ButtonGroup(m.VGroup):
+    """Group buttons together to apply group logic to transitions.
+
+    ButtonGroup is a VGroup of Buttons with a group level callback function.
+
+    Parameters
+    ----------
+    *buttons
+        The buttons to initially add to the ButtonGroup.
+    callback
+        A group level callback that will wrap individual buttons callbacks.
+    **kwargs
+        Keyword arguments forwarded to the parent VGroup.
+
+    Notes
+    -----
+    A button can belong to multiple Groups at the same time. The original button
+    callback will be called first and only once. The group callbacks will be
+    called in the same order the button was added to the groups.
+
+    A button that is removed from a ButtonGroup will still have its callback wrapped
+    in the group callback.
+
+    """
+
+    def __init__(
+        self,
+        *buttons: Button,
+        callback: Callable[["ButtonGroup", Button, str, str], None] = (
+            lambda group, button, from_state, to_state: None
+        ),
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self._callback = callback
+        self.add(*buttons)
+
+    def add(self, *buttons: Button) -> Self:  # type: ignore[override]
+        """Add new buttons to the ButtonGroup."""
+        # Wrap the callback for each button to inject group logic
+        for btn in buttons:
+            if btn in self.submobjects:
+                return self
+
+            original_callback = btn._callback
+
+            def make_wrapper(
+                b: Button, orig_cb: Callable[[Button, str, str], None]
+            ) -> Callable[[Button, str, str], None]:
+                def wrapper(button: "Button", from_state: str, to_state: str) -> None:
+                    # call the button original callback
+                    orig_cb(button, from_state, to_state)
+
+                    # call the group callback
+                    self._callback(self, button, from_state, to_state)
+
+                return wrapper
+
+            btn._callback = make_wrapper(btn, original_callback)
+
+        return super().add(*buttons)
+
+
 class PushButton(Button):
     """A 2-state button: PUSHED/UNPUSHED with a bevel effect.
 

@@ -1,7 +1,7 @@
 import manim as m
 import pytest
 
-from manim_utils.ui.buttons import Button, PushButton
+from manim_utils.ui.buttons import Button, ButtonGroup, PushButton
 
 
 # ----------------------------------------------------------------------
@@ -24,6 +24,32 @@ class TstButton(Button):
 def btn():
     shape = m.Circle()
     return TstButton(shape=shape)
+
+
+@pytest.fixture
+def btns():
+    """Create multiple test buttons."""
+    return [TstButton(shape=m.Circle()) for _ in range(3)]
+
+
+@pytest.fixture
+def btn_group(btns):
+    """Create a ButtonGroup with test buttons."""
+    return ButtonGroup(*btns)
+
+
+@pytest.fixture
+def btn_with_cb():
+    """Create a button with a custom callback."""
+    shape = m.Circle()
+    calls = []
+
+    def callback(button, from_state, to_state):
+        calls.append((button, from_state, to_state))
+
+    btn = TstButton(shape=shape, callback=callback)
+    btn._calls = calls  # type: ignore[reportAttributeAccessIssue]
+    return btn
 
 
 # ----------------------------------------------------------------------
@@ -91,24 +117,16 @@ def test_button_transition_invalid_state(btn):
         btn.transition("INVALID_STATE")
 
 
-def test_button_callback_execution():
+def test_button_callback_execution(btn_with_cb):
     """Test that the callback is called during transition."""
-    shape = m.Circle()
-    call_log = []
+    btn_with_cb.transition()  # STATE_A -> STATE_B
+    btn_with_cb.transition()  # STATE_B -> STATE_A
+    btn_with_cb.transition("STATE_A")  # STATE_A -> STATE_A
 
-    def mock_callback(button, from_state, to_state):
-        call_log.append((button, from_state, to_state))
-
-    btn = TstButton(shape=shape, callback=mock_callback)
-
-    btn.transition()  # STATE_A -> STATE_B
-    btn.transition()  # STATE_B -> STATE_A
-    btn.transition("STATE_A")  # STATE_A -> STATE_A
-
-    assert len(call_log) == 3
-    assert call_log[0] == (btn, "STATE_A", "STATE_B")
-    assert call_log[1] == (btn, "STATE_B", "STATE_A")
-    assert call_log[2] == (btn, "STATE_A", "STATE_A")
+    assert len(btn_with_cb._calls) == 3
+    assert btn_with_cb._calls[0] == (btn_with_cb, "STATE_A", "STATE_B")
+    assert btn_with_cb._calls[1] == (btn_with_cb, "STATE_B", "STATE_A")
+    assert btn_with_cb._calls[2] == (btn_with_cb, "STATE_A", "STATE_A")
 
 
 def test_button_return_self(btn):
@@ -214,6 +232,226 @@ def test_button_adds_all_components_in_init(btn):
     # Check that the button group contains the expected submobjects
     # Based on __init__: template, contents_template, deco_group, content
     assert len(btn.submobjects) == 4
+
+
+# ----------------------------------------------------------------------
+# ButtonGroup
+# ----------------------------------------------------------------------
+def test_btn_group_initializes_with_buttons(btn_group, btns):
+    """ButtonGroup should contain all buttons passed to constructor."""
+    assert len(btn_group.submobjects) == len(btns)
+    for btn in btns:
+        assert btn in btn_group.submobjects
+
+
+def test_btn_group_empty_without_buttons():
+    """ButtonGroup can be created without buttons."""
+    bg = ButtonGroup()
+    assert len(bg.submobjects) == 0
+
+
+def test_btn_group_forwards_kwargs():
+    """ButtonGroup should forward kwargs to VGroup."""
+    bg = ButtonGroup(fill_opacity=0.5)
+    assert bg.fill_opacity == 0.5
+
+
+def test_original_callback_preserved(btn_with_cb):
+    """Original button callback should still be callable."""
+    assert callable(btn_with_cb._callback)
+
+
+def test_group_callback_wraps_button_callback(btn_with_cb):
+    """ButtonGroup should wrap the button's callback."""
+    calls = []
+
+    def group_callback(group, button, from_state, to_state):
+        calls.append((group, button, from_state, to_state))
+
+    bg = ButtonGroup(btn_with_cb, callback=group_callback)
+
+    # Trigger a transition
+    btn_with_cb.transition("STATE_B")
+
+    # Both callbacks should have been called
+    assert len(btn_with_cb._calls) == 1
+    assert len(calls) == 1
+    assert btn_with_cb._calls[0] == (btn_with_cb, "STATE_A", "STATE_B")
+    assert calls[0] == (bg, btn_with_cb, "STATE_A", "STATE_B")
+
+
+def test_multiple_buttons_each_get_wrapped(btns):
+    """Each button in the group should have its callback wrapped."""
+    calls_per_button = []
+
+    def make_callback(idx):
+        def callback(button, from_state, to_state):
+            calls_per_button.append((idx, from_state, to_state))
+
+        return callback
+
+    # Assign unique callbacks to each button
+    for i, btn in enumerate(btns):
+        btn._callback = make_callback(i)
+
+    bg = ButtonGroup(*btns)
+
+    # Transition each button
+    for btn in bg.submobjects:
+        btn.transition("STATE_B")
+
+    # Each button's callback should have been called once
+    assert len(calls_per_button) == 3
+    for i in range(3):
+        assert (i, "STATE_A", "STATE_B") in calls_per_button
+
+
+def test_default_callback_is_noop():
+    """Default callback should be a no-op."""
+    btn = TstButton(shape=m.Circle())
+    bg = ButtonGroup(btn)  # No callback provided
+
+    # Should not raise
+    btn.transition("STATE_B")
+
+
+def test_add_button_to_existing_group(btn_group, btn):
+    """Should be able to add a button to an existing group."""
+    initial_count = len(btn_group.submobjects)
+    btn_group.add(btn)
+    assert len(btn_group.submobjects) == initial_count + 1
+    assert btn in btn_group.submobjects
+
+
+def test_add_wraps_new_button_callback(btn_group, btn):
+    """Adding a button should wrap its callback with group logic."""
+    calls = []
+
+    def group_callback(group, button, from_state, to_state):
+        calls.append((group, button, from_state, to_state))
+
+    # Recreate group with callback
+    bg = ButtonGroup(callback=group_callback)
+    bg.add(btn)
+
+    btn.transition("STATE_B")
+
+    assert len(calls) == 1
+    assert calls[0] == (bg, btn, "STATE_A", "STATE_B")
+
+
+def test_add_multiple_buttons_at_once(btn_group):
+    """Should be able to add multiple buttons at once."""
+    new_buttons = [TstButton(shape=m.Circle()) for _ in range(2)]
+    initial_count = len(btn_group.submobjects)
+
+    btn_group.add(*new_buttons)
+
+    assert len(btn_group.submobjects) == initial_count + 2
+    for btn in new_buttons:
+        assert btn in btn_group.submobjects
+
+
+def test_add_button_twice_wraps_only_once(btn_group, btn):
+    """Adding the same button twice should not double-wrap the callback."""
+    calls = []
+
+    def group_callback(group, button, from_state, to_state):
+        calls.append((from_state, to_state))
+
+    bg = ButtonGroup(callback=group_callback)
+    bg.add(btn)
+    bg.add(btn)  # Add again
+
+    btn.transition("STATE_B")
+
+    assert len(calls) == 1
+    assert len(bg.submobjects) == 1
+
+
+def test_button_state_after_transition_in_group(btn_group):
+    """Button state should update correctly when in a group."""
+    btn = btn_group[0]
+    btn.transition("STATE_B")
+    assert btn.state == "STATE_B"
+
+
+def test_button_transitions_still_work_in_group(btn_group):
+    """Buttons should still be able to transition normally in a group."""
+    btn = btn_group[0]
+
+    assert btn.state == "STATE_A"
+    btn.transition()  # Cycle to next state
+    assert btn.state == "STATE_B"
+    btn.transition()  # Cycle again
+    assert btn.state == "STATE_A"
+
+
+def test_add_empty_arguments(btn_group):
+    """Adding no buttons should not change the group."""
+    initial_count = len(btn_group.submobjects)
+    btn_group.add()
+    assert len(btn_group.submobjects) == initial_count
+
+
+def test_callback_with_lambda():
+    """Lambda callbacks should work correctly."""
+    calls = []
+    callback = lambda g, b, f, t: calls.append((g, b, f, t))  # noqa: E731
+
+    btn = TstButton(shape=m.Circle())
+    bg = ButtonGroup(btn, callback=callback)
+
+    btn.transition("STATE_B")
+
+    assert len(calls) == 1
+    assert calls[0] == (bg, btn, "STATE_A", "STATE_B")
+
+
+def test_button_removed_from_group_still_has_wrapped_callback(btn_group):
+    """Removing a button doesn't unwrap its callback (current behavior)."""
+    # Note: This is a limitation of the current implementation
+    # The callback remains wrapped even after removal
+    assert len(btn_group.submobjects) == 3
+    btn = btn_group.submobjects[0]
+    original_callback = btn._callback
+
+    btn_group.remove(btn)
+
+    # Callback is still wrapped (this is expected with current design)
+    assert btn._callback is original_callback
+    # VGroup is updated
+    assert len(btn_group.submobjects) == 2
+
+
+def test_button_added_to_multiple_groups_calls_all_callbacks(btn_group, btn_with_cb):
+    calls = []
+
+    def cb(g, b, f, t):
+        calls.append(g)
+
+    bg = ButtonGroup(callback=cb)
+    btn_group._callback = cb
+    assert len(calls) == 0
+    btn_group.add(btn_with_cb)
+    bg.add(btn_with_cb)
+    btn_with_cb.transition()
+    assert len(calls) == 2
+    assert calls[0] is btn_group
+    assert calls[1] is bg
+    btn_with_cb.transition()
+    assert len(calls) == 4
+    btn_group.remove(btn)
+    btn_with_cb.transition()
+    assert len(calls) == 6
+    # the button callback is called only once per transition
+    assert len(btn_with_cb._calls) == 3
+
+
+def test_add_returns_self(btn_group, btn):
+    """add() should return self for method chaining."""
+    result = btn_group.add(btn)
+    assert result is btn_group
 
 
 # ----------------------------------------------------------------------
