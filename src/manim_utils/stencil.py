@@ -2,6 +2,7 @@ from collections.abc import Callable
 from typing import Any
 
 import manim as m
+from manim.utils.unit import Pixels
 
 
 class Stencil(m.VMobject):
@@ -59,11 +60,11 @@ class Stencil(m.VMobject):
         )
         self.match_points(stencil)
 
-    def _adapt_stencil(self, mob: m.Mobject, dt: float) -> None:
+    def _adapt_stencil(self, mob: m.Mobject) -> None:
         """Keep the stencil aligned with the wrapped Mobject."""
         if self._wrapped is None:
             return
-        self._shape.surround(self._wrapped, stretch=True)
+        self._shape.surround(self._wrapped, stretch=True, buff=1 * Pixels)
         self._make_stencil()
 
     @property
