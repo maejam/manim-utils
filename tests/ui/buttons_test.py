@@ -1,7 +1,7 @@
 import manim as m
 import pytest
 
-from manim_utils.ui.buttons import Button, ButtonGroup, PushButton
+from manim_utils.ui.buttons import Button, ButtonDict, ButtonGroup, PushButton
 
 
 # ----------------------------------------------------------------------
@@ -27,6 +27,20 @@ def btn():
 
 
 @pytest.fixture
+def btn_with_cb():
+    """Create a button with a custom callback."""
+    shape = m.Circle()
+    calls = []
+
+    def callback(button, from_state, to_state):
+        calls.append((button, from_state, to_state))
+
+    btn = TstButton(shape=shape, callback=callback)
+    btn._calls = calls  # type: ignore[reportAttributeAccessIssue]
+    return btn
+
+
+@pytest.fixture
 def btns():
     """Create multiple test buttons."""
     return [TstButton(shape=m.Circle()) for _ in range(3)]
@@ -39,17 +53,21 @@ def btn_group(btns):
 
 
 @pytest.fixture
-def btn_with_cb():
-    """Create a button with a custom callback."""
-    shape = m.Circle()
+def btn_dict(btns):
+    """Create a ButtonDict with test buttons."""
+    return ButtonDict(dict(zip(["b1", "b2", "b3"], btns, strict=True)))
+
+
+@pytest.fixture
+def btn_dict_with_cb(btns):
+    """Create a ButtonDict with test buttons and a callback."""
     calls = []
-
-    def callback(button, from_state, to_state):
-        calls.append((button, from_state, to_state))
-
-    btn = TstButton(shape=shape, callback=callback)
-    btn._calls = calls  # type: ignore[reportAttributeAccessIssue]
-    return btn
+    bd = ButtonDict(
+        dict(zip(["b1", "b2", "b3"], btns, strict=True)),
+        callback=lambda g, b, f, t: calls.append((g, b, f, t)),
+    )
+    bd._calls = calls  # type: ignore[reportAttributeAccessIssue]
+    return bd
 
 
 # ----------------------------------------------------------------------
@@ -452,6 +470,144 @@ def test_add_returns_self(btn_group, btn):
     """add() should return self for method chaining."""
     result = btn_group.add(btn)
     assert result is btn_group
+
+
+# ----------------------------------------------------------------------
+# ButtonDict
+# ----------------------------------------------------------------------
+def test_initialization_with_buttons(btn_dict_with_cb, btns):
+    """Test that ButtonDict initializes with buttons and wraps callbacks."""
+    assert len(btn_dict_with_cb) == 3
+    assert list(btn_dict_with_cb.keys()) == ["b1", "b2", "b3"]
+
+    # Verify all buttons are in the VGroup
+    assert len(btn_dict_with_cb.submobjects) == 3
+
+    # Verify internal data mapping
+    assert btn_dict_with_cb["b1"] is btns[0]
+    assert btn_dict_with_cb["b2"] is btns[1]
+    assert btn_dict_with_cb["b3"] is btns[2]
+
+    btns[0].transition("STATE_B")
+    assert len(btn_dict_with_cb._calls) == 1
+    assert btn_dict_with_cb._calls[0] == (
+        btn_dict_with_cb.group,
+        btns[0],
+        "STATE_A",
+        "STATE_B",
+    )
+
+
+def test_initialization_empty():
+    """Test creating an empty ButtonDict."""
+    bd = ButtonDict()
+    assert len(bd) == 0
+    assert len(bd.submobjects) == 0
+    assert isinstance(bd.group, m.VGroup)
+    assert len(bd.group) == 0
+    assert len(bd.data) == 0
+
+
+def test_setitem_adds_to_group_and_dict(btn_dict_with_cb, btn):
+    """Test that adding a button updates both the dict and the VGroup."""
+    btn_dict_with_cb["new"] = btn
+
+    assert len(btn_dict_with_cb) == 4
+    assert btn_dict_with_cb["new"] is btn
+    assert btn in btn_dict_with_cb.submobjects
+    assert btn in btn_dict_with_cb.group.submobjects
+
+
+def test_setitem_type_error(btn_dict_with_cb):
+    """Test that non-Button instances raise TypeError."""
+    with pytest.raises(TypeError, match="expects Button instances"):
+        btn_dict_with_cb["invalid"] = "not a button"
+
+
+def test_delitem_removes_from_all_sources(btn_dict_with_cb, btns):
+    """Test that deleting a key removes it from dict, VGroup, and Group."""
+    assert len(btn_dict_with_cb) == 3
+    assert len(btn_dict_with_cb.submobjects) == 3
+
+    del btn_dict_with_cb["b1"]
+
+    assert len(btn_dict_with_cb) == 2
+    assert len(btn_dict_with_cb.submobjects) == 2
+    assert "b1" not in btn_dict_with_cb
+    assert btns[0] not in btn_dict_with_cb.submobjects
+    assert btns[0] not in btn_dict_with_cb.group.submobjects
+
+
+def test_contains_operator(btn_dict_with_cb):
+    """Test the 'in' operator."""
+    assert "b1" in btn_dict_with_cb
+    assert "nonexistent" not in btn_dict_with_cb
+
+
+def test_iter_and_len(btn_dict_with_cb):
+    """Test iteration and length."""
+    assert len(btn_dict_with_cb) == 3
+    keys = list(btn_dict_with_cb)
+    assert set(keys) == {"b1", "b2", "b3"}
+
+
+def test_keys_values_items(btn_dict_with_cb):
+    """Test dict view methods."""
+    assert set(btn_dict_with_cb.keys()) == {"b1", "b2", "b3"}
+    assert list(btn_dict_with_cb.values()) == [
+        btn_dict_with_cb["b1"],
+        btn_dict_with_cb["b2"],
+        btn_dict_with_cb["b3"],
+    ]
+
+    items = list(btn_dict_with_cb.items())
+    assert len(items) == 3
+    assert ("b1", btn_dict_with_cb["b1"]) in items
+
+
+def test_manim_methods(btn_dict_with_cb):
+    """Test that VGroup methods like arrange work."""
+    # should not raise an error
+    btn_dict_with_cb.arrange(m.DOWN)
+    btn_dict_with_cb.shift(m.RIGHT)
+
+    assert (
+        btn_dict_with_cb.submobjects[0].get_center()[1]
+        != btn_dict_with_cb.submobjects[1].get_center()[1]
+    )
+
+
+def test_callback_wrapping(btn_dict_with_cb, btn_with_cb):
+    """Test that the group callback is invoked when a button state changes."""
+
+    btn_dict_with_cb["new"] = btn_with_cb
+    btn_dict_with_cb["new"].transition("STATE_B")
+    assert len(btn_dict_with_cb._calls) == 1
+    assert btn_dict_with_cb._calls[0] == (
+        btn_dict_with_cb.group,
+        btn_with_cb,
+        "STATE_A",
+        "STATE_B",
+    )
+    assert len(btn_with_cb._calls) == 1
+    assert btn_with_cb._calls[0] == (
+        btn_with_cb,
+        "STATE_A",
+        "STATE_B",
+    )
+
+
+def test_data_property_access(btns, btn_dict_with_cb):
+    """Test accessing the internal data dict."""
+    assert btn_dict_with_cb.data is btn_dict_with_cb._data
+    assert "b1" in btn_dict_with_cb.data
+    assert btn_dict_with_cb.data["b1"] is btns[0]
+
+
+def test_group_property_access(btns, btn_dict_with_cb):
+    """Test accessing the internal ButtonGroup."""
+    assert isinstance(btn_dict_with_cb.group, ButtonGroup)
+    assert len(btn_dict_with_cb.group.submobjects) == 3
 
 
 # ----------------------------------------------------------------------

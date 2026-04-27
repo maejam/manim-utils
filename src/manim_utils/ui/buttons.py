@@ -1,5 +1,13 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Hashable, Mapping
+from collections.abc import (
+    Callable,
+    Hashable,
+    ItemsView,
+    Iterator,
+    KeysView,
+    Mapping,
+    ValuesView,
+)
 from typing import (
     Any,
     Self,
@@ -248,6 +256,87 @@ class ButtonGroup(m.VGroup):
             btn._callback = make_wrapper(btn, original_callback)
 
         return super().add(*buttons)
+
+
+class ButtonDict(m.VGroup):
+    """A VGroup of Buttons that acts like a dictionary.
+
+    ButtonDict is a VGroup subclass to provide all manim VGroup methods.
+
+    Parameters
+    ----------
+    *buttons
+        A Mapping of buttons to initially add to the ButtonDict.
+    callback
+        A group level callback that will wrap individual buttons callbacks.
+    **kwargs
+        Keyword arguments forwarded to the parent VGroup.
+
+    Attributes
+    ----------
+    data
+        The dictionary mapping labels to Button instances.
+    group
+        The ButtonGroup to which the callback machinery is delegated.
+
+    """
+
+    def __init__(
+        self,
+        buttons: Mapping[str, Button] | None = None,
+        callback: Callable[[m.VGroup, Button, str, str], None] = (
+            lambda group, button, from_state, to_state: None
+        ),
+        **kwargs: Any,
+    ):
+        super().__init__(**kwargs)
+        self._data: dict[str, Button] = {}
+        self._group = ButtonGroup(callback=callback)
+        if buttons:
+            for key, value in buttons.items():
+                self[key] = value
+
+    def __setitem__(self, key: str, button: Button) -> None:  # type: ignore[override]
+        if not isinstance(button, Button):
+            raise TypeError(f"ButtonDict expects Button instances, got {type(button)}.")
+
+        self._group.add(button)
+        super().add(button)
+        self._data[key] = button
+
+    def __getitem__(self, key: str) -> Button:
+        return self._data[key]
+
+    def __delitem__(self, key: str) -> None:
+        button = self._data.pop(key)
+        self._group.remove(button)
+        super().remove(button)
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._data
+
+    def __iter__(self) -> Iterator[str]:  # pyright: ignore[reportIncompatibleMethodOverride]
+        return iter(self._data)
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def keys(self) -> KeysView[str]:
+        return self._data.keys()
+
+    def values(self) -> ValuesView[Button]:
+        return self._data.values()
+
+    def items(self) -> ItemsView[str, Button]:
+        return self._data.items()
+
+    @property
+    def group(self) -> "ButtonGroup":
+        return self._group
+
+    @property
+    def data(self) -> dict[str, Button]:
+        return self._data
 
 
 class PushButton(Button):
