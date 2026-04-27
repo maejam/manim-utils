@@ -3,6 +3,7 @@ from collections.abc import (
     Callable,
     Hashable,
     ItemsView,
+    Iterable,
     Iterator,
     KeysView,
     Mapping,
@@ -15,6 +16,7 @@ from typing import (
 )
 
 import manim as m
+from manim.typing import Vector3D
 
 
 class Button(m.VGroup, ABC):
@@ -206,17 +208,27 @@ class ButtonGroup(m.VGroup):
         The buttons to initially add to the ButtonGroup.
     callback
         A group level callback that will wrap individual buttons callbacks.
+    direction
+        The vector specifying in which direction, if any, the Group should be arranged.
+    buff
+        The buffer between each button if direction is given.
     **kwargs
         Keyword arguments forwarded to the parent VGroup.
 
     Notes
     -----
-    A button can belong to multiple Groups at the same time. The original button
+     - A button can belong to multiple Groups at the same time. The original button
     callback will be called first and only once. The group callbacks will be
     called in the same order the button was added to the groups.
 
-    A button that is removed from a ButtonGroup will still have its callback wrapped
+     - A button that is removed from a ButtonGroup will still have its callback wrapped
     in the group callback.
+
+    - All buttons are positioned relative to the ones before them. This means that in a
+    ButtonGroup with only one Button, this button will be the anchor for the next
+    inserted ones. It also means that when removing the first button, the next ones will
+    not fill the gap, and all remaining buttons will be positioned relative to the new
+    first one.
 
     """
 
@@ -226,11 +238,18 @@ class ButtonGroup(m.VGroup):
         callback: Callable[["ButtonGroup", Button, str, str], None] = (
             lambda group, button, from_state, to_state: None
         ),
+        direction: Vector3D | None = None,
+        buff: float = 0.1,
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
         self._callback = callback
+        self.direction = direction
+        self.buff = buff
+
+        super().__init__(**kwargs)
+
         self.add(*buttons)
+        self._rearrange()
 
     def add(self, *buttons: Button) -> Self:  # type: ignore[override]
         """Add new buttons to the ButtonGroup."""
@@ -255,7 +274,28 @@ class ButtonGroup(m.VGroup):
 
             btn._callback = make_wrapper(btn, original_callback)
 
-        return super().add(*buttons)
+            if self.direction is not None:
+                if len(self) == 0:
+                    btn.move_to(self.get_center())
+                else:
+                    btn.next_to(self, self.direction, buff=self.buff)
+            super().add(btn)
+
+        return self
+
+    def remove(self, *mobjects: m.Mobject) -> Self:
+        super().remove(*mobjects)
+        if len(self) > 0:
+            self._rearrange()
+        return self
+
+    def _rearrange(self) -> None:
+        """Re-position all current children."""
+        if len(self) == 0:
+            return
+        if self.direction is not None:
+            for i in range(1, len(self)):
+                self[i].next_to(self[i - 1], self.direction, buff=self.buff)
 
 
 class ButtonDict(m.VGroup):
@@ -265,10 +305,14 @@ class ButtonDict(m.VGroup):
 
     Parameters
     ----------
-    *buttons
-        A Mapping of buttons to initially add to the ButtonDict.
+    buttons
+        The key-value mapping of keys and Buttons.
     callback
         A group level callback that will wrap individual buttons callbacks.
+    direction
+        The vector specifying in which direction, if any, the Group should be arranged.
+    buff
+        The buffer between each button if direction is given.
     **kwargs
         Keyword arguments forwarded to the parent VGroup.
 
@@ -283,18 +327,44 @@ class ButtonDict(m.VGroup):
 
     def __init__(
         self,
-        buttons: Mapping[str, Button] | None = None,
+        buttons: Mapping[str, Button] | Iterable[tuple[str, Button]] | None = None,
         callback: Callable[[m.VGroup, Button, str, str], None] = (
             lambda group, button, from_state, to_state: None
         ),
+        direction: Vector3D | None = None,
+        buff: float = 0.1,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
         self._data: dict[str, Button] = {}
-        self._group = ButtonGroup(callback=callback)
+        self._group = ButtonGroup(callback=callback, direction=direction, buff=buff)
         if buttons:
-            for key, value in buttons.items():
+            for key, value in dict(buttons).items():
                 self[key] = value
+
+    def add(  # type: ignore[override]
+        self, buttons: Mapping[str, Button] | Iterable[tuple[str, Button]] | None = None
+    ) -> Self:
+        """Add the key-value pairs to the :class:`ButtonDict` object.
+
+        Parameters
+        ----------
+        buttons
+            The key-value mapping of keys and Buttons.
+
+        Returns
+        -------
+        Returns the :class:`ButtonDict` object on which this method was called.
+
+        """
+        if buttons is not None:
+            for key, value in dict(buttons).items():
+                self[key] = value
+        return self
+
+    def remove(self, key: str) -> Self:  # type: ignore[override]
+        del self[key]
+        return self
 
     def __setitem__(self, key: str, button: Button) -> None:  # type: ignore[override]
         if not isinstance(button, Button):

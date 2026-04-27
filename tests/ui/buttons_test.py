@@ -1,4 +1,5 @@
 import manim as m
+import numpy as np
 import pytest
 
 from manim_utils.ui.buttons import Button, ButtonDict, ButtonGroup, PushButton
@@ -472,6 +473,63 @@ def test_add_returns_self(btn_group, btn):
     assert result is btn_group
 
 
+def test_direction_instantiating_with_single_button(btn):
+    g = ButtonGroup(btn, direction=m.RIGHT, buff=0.4)
+    assert np.array_equal(g.get_center(), m.ORIGIN)
+    assert np.array_equal(btn.get_center(), m.ORIGIN)
+
+
+def test_direction_instantiating_with_multiple_buttons(btns):
+    g = ButtonGroup(*btns, direction=m.RIGHT, buff=0.4)
+    g.move_to(m.ORIGIN, aligned_edge=m.LEFT)
+    assert np.array_equal(g.get_edge_center(m.LEFT), m.ORIGIN)
+    assert np.array_equal(btns[0].get_edge_center(m.LEFT), m.ORIGIN)
+    assert btns[1].get_x() == pytest.approx(btns[0].get_x() + btns[0].width + 0.4)
+    assert btns[2].get_x() == pytest.approx(
+        btns[0].get_x() + 2 * (btns[0].width + 0.4)
+    )  # buttons have same width
+
+
+def test_direction_adding_one_button_at_a_time(btns):
+    g = ButtonGroup(btns[0], direction=m.RIGHT, buff=0.4)
+    assert np.array_equal(btns[0].get_center(), m.ORIGIN)
+    g.add(btns[1])
+    assert np.array_equal(btns[0].get_center(), m.ORIGIN)
+    assert btns[1].get_x() == btns[0].get_x() + btns[0].width + 0.4
+    g.add(btns[2])
+    assert np.array_equal(btns[0].get_center(), m.ORIGIN)
+    assert btns[1].get_x() == btns[0].get_x() + btns[0].width + 0.4
+    assert btns[2].get_x() == pytest.approx(btns[0].get_x() + 2 * (btns[0].width + 0.4))
+
+
+def test_direction_adding_all_button_at_once(btns):
+    g = ButtonGroup(btns[0], direction=m.RIGHT, buff=0.4)
+    assert np.array_equal(btns[0].get_center(), m.ORIGIN)
+    g.add(btns[1], btns[2])
+    assert np.array_equal(btns[0].get_center(), m.ORIGIN)
+    assert btns[1].get_x() == btns[0].get_x() + btns[0].width + 0.4
+    assert btns[2].get_x() == pytest.approx(btns[0].get_x() + 2 * (btns[0].width + 0.4))
+
+
+def test_direction_removing_buttons(btns, btn):
+    g = ButtonGroup(*btns, btn, direction=m.RIGHT, buff=0.4)
+    assert [b.get_x() for b in g] == pytest.approx([0, 2.4, 4.8, 7.2])
+    # remove last one
+    g.remove(btn)
+    assert [b.get_x() for b in g] == pytest.approx([0, 2.4, 4.8])
+    # remove middle one
+    g.remove(btns[1])
+    assert [b.get_x() for b in g] == pytest.approx([0, 2.4])
+    # remove first one: does not fill the gap
+    g.remove(btns[0])
+    assert [b.get_x() for b in g] == pytest.approx([2.4])
+    assert len(g) == 1
+    assert btns[2] in g
+    # add: positioned relative the new first button
+    g.add(btn)
+    assert [b.get_x() for b in g] == pytest.approx([2.4, 4.8])
+
+
 # ----------------------------------------------------------------------
 # ButtonDict
 # ----------------------------------------------------------------------
@@ -506,6 +564,38 @@ def test_initialization_empty():
     assert isinstance(bd.group, m.VGroup)
     assert len(bd.group) == 0
     assert len(bd.data) == 0
+
+
+def test_initialization_iterable(btn):
+    btn2 = btn.copy()
+    bd = ButtonDict([("btn", btn), ("btn2", btn2)])
+    assert len(bd) == 2
+    assert list(bd.keys()) == ["btn", "btn2"]
+
+    # Verify all buttons are in the VGroup
+    assert len(bd.submobjects) == 2
+
+    # Verify internal data mapping
+    assert bd["btn"] is btn
+    assert bd["btn2"] is btn2
+
+
+def test_buttondict_add_remove(btn_dict, btn):
+    assert btn not in btn_dict.submobjects
+    btn_dict.add({"btn": btn})
+    assert btn in btn_dict.submobjects
+    assert btn in btn_dict._group
+    assert btn_dict["btn"] is btn
+    btn_dict.remove("btn")
+    assert btn not in btn_dict.submobjects
+    assert btn not in btn_dict._group
+    with pytest.raises(KeyError):
+        assert btn_dict["btn"] is btn
+    # iterable syntax
+    btn_dict.add([("btn", btn)])
+    assert btn in btn_dict.submobjects
+    assert btn in btn_dict._group
+    assert btn_dict["btn"] is btn
 
 
 def test_setitem_adds_to_group_and_dict(btn_dict_with_cb, btn):
