@@ -251,8 +251,8 @@ class ButtonGroupDemo(Scene):
             stroke_width=0,
         )
 
-        def callback(group, button, state_from, state_to):
-            if state_to == "ACTIVE":
+        def callback(group, button, from_state, to_state):
+            if to_state == "ACTIVE":
                 for btn in group:
                     if btn is not button:
                         btn.transition("INACTIVE")
@@ -260,9 +260,8 @@ class ButtonGroupDemo(Scene):
         tab1 = HighlightButton(shape=base_shape, contents=Text("Tab1"))
         tab2 = HighlightButton(shape=base_shape, contents=Text("Tab2"))
         tab3 = HighlightButton(shape=base_shape, contents=Text("Tab3"))
-        tabs = ButtonGroup(tab1, tab2, tab3, callback=callback)
-        tabs.arrange(RIGHT)
-        self.add(tabs)
+        tabs = ButtonGroup(tab1, tab2, tab3, callback=callback, direction=RIGHT, buff=0.4)
+        self.add(tabs.shift(LEFT * 3))
 
         self.wait()
         tab1.transition("ACTIVE")
@@ -276,4 +275,4 @@ class ButtonGroupDemo(Scene):
 
 ```
 
-
+* `ButtonDict`: a VGroup of Buttons with a group level callback function and string labels access.
