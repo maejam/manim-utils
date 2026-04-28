@@ -9,6 +9,7 @@
   - [animations](#animations)
   - [ui](#ui)
     - [Buttons](#Buttons)
+  - [mobjects](#mobjects)
 
 ---
 
@@ -276,3 +277,33 @@ class ButtonGroupDemo(Scene):
 ```
 
 * `ButtonDict`: a VGroup of Buttons with a group level callback function and string labels access.
+
+
+### Mobjects  
+
+Simple (V)Mobjects utilmities.
+
+* `IconText`: A simple Mobject combining an icon and a text. Handles svg and raster files to overcome the limitations of manim about svg files. Also, it resizes the raster images using Pillow directly because downsampling with manim `scale` method does not always give good results.
+
+```python
+
+
+from manim import *
+from manim_utils import IconText
+
+
+class Example(Scene):
+    def construct(self):
+        icon_text = IconText(Circle(fill_color=RED, fill_opacity=0.2), "Hello")
+        self.add(icon_text)
+
+        custom = IconText(
+            Star(), # SVG/JPG/PNG files also accepted
+            "World",
+            font_size=36,
+            icon_height=0.8,
+            text_color=YELLOW,
+        )
+        self.add(custom.next_to(icon_text, DOWN))
+
+```
