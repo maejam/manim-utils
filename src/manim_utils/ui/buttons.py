@@ -274,11 +274,8 @@ class ButtonGroup(m.VGroup):
 
             btn._callback = make_wrapper(btn, original_callback)
 
-            if self.direction is not None:
-                if len(self) == 0:
-                    btn.move_to(self.get_center())
-                else:
-                    btn.next_to(self, self.direction, buff=self.buff)
+            if self.direction is not None and len(self) > 0:
+                btn.next_to(self, self.direction, buff=self.buff)
             super().add(btn)
 
         return self
