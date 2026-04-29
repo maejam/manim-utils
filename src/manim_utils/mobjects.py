@@ -117,6 +117,9 @@ class IconText(m.Mobject):
         self.add(self.icon, self.text)
         self.arrange(direction, buff=buff)
 
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(text={self.text})"
+
 
 class VIconText(m.VMobject):
     """A simple VMobject combining an icon and text.
@@ -202,3 +205,6 @@ class VIconText(m.VMobject):
         # arrange
         self.add(self.icon, self.text)
         self.arrange(direction, buff=buff)
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}(text={self.text})"
