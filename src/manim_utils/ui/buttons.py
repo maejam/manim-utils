@@ -60,20 +60,24 @@ class Button(m.VGroup, ABC):
     and `Button._contents`).
     This means that no submobject should be added/removed to the base shape or the
     contents through the lifetime of the button. Also, mutating the shape or the content
-    in a persistent way should be done on `Button._shape` and `Button._contents`
-    directly and will need a transition to be visible:
+    opacities in a persistent way should be done on `Button._shape` and
+    `Button._contents`, while mutating anything else should be done on the templates
+    `Button._template` and `Button._contents_template` respectively:
 
     ```
-    # don't add/remove submobjects to _shape and _contents
+    # don't add/remove submobjects to _shape/_contents or _template/_contents_template
     btn._shape.add(Circle()) # WRONG
 
     # mutating current content: GOOD but will not persist after transition
-    btn.content.set_fill(RED)
+    btn.content.set_fill(RED, opacity=0.5)
 
     # mutating base content: GOOD, will persist, but requires transition to be visible
-    btn._contents["ACTIVE"].set_fill(RED)
+    btn._contents["ACTIVE"].set_fill(opacity=0.5)
+    btn._contents_template["ACTIVE"].set_fill(RED)
     btn.transition("ACTIVE")
     ```
+    It is probably easier to discard a Button and build a new one if this kind of
+    mutation is needed though.
 
     """
 
