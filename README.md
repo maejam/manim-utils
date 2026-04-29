@@ -9,7 +9,6 @@
   - [animations](#animations)
   - [ui](#ui)
     - [Buttons](#Buttons)
-  - [mobjects](#mobjects)
   - [groups](#groups)
 
 ---
@@ -161,7 +160,8 @@ class TrackedAnimationScene(Scene):
         self.play(anim2)
         print(anim2._status)
 
-```
+```  
+
 
 ### UI  
 
@@ -277,17 +277,18 @@ class ButtonGroupDemo(Scene):
 
 ```
 
-* `ButtonDict`: a VGroup of Buttons with a group level callback function and string labels access.
+* `ButtonDict`: a VGroup of Buttons with a group level callback function and string labels access.  
 
 
-### Mobjects  
+### Groups  
 
-Simple (V)Mobjects-related utilities.
+Simple (V)Groups-related utilities.
 
-* `IconText`: A simple Mobject combining an icon and a text. Handles svg and raster files to overcome the limitations of manim about svg files. Also, it resizes the raster images using Pillow directly because downsampling with manim `scale` method does not always give good results.
+* `GroupDict`: similar to `VDict` for Mobjects. Does not handle displaying keys.
+
+* `IconText`: A simple Group combining an icon and a text. Handles svg and raster files to overcome the limitations of manim about svg files. Also, it resizes the raster images using Pillow directly because downsampling with manim `scale` method does not always give good results.
 
 ```python
-
 
 from manim import *
 from manim_utils import IconText
@@ -309,12 +310,5 @@ class Example(Scene):
 
 ```
 
-* `VIconText`: similar to `IconText`, but does not accept raster images as icons. Can be used in a vectorized context though, which makes ot suitable as a `Button` content for instance.  
-
-
-### Groups  
-
-Simple (V)Groups-related utilities.
-
-* `GroupDict`: similar to `VDict` for Mobjects. Does not handle displaying keys.
+* `VIconText`: similar to `IconText`, but does not accept raster images as icons. Can be used in a vectorized context though, which makes it suitable as a `Button` content for instance.  
 
