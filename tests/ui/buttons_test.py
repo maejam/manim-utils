@@ -2,7 +2,13 @@ import manim as m
 import numpy as np
 import pytest
 
-from manim_utils.ui.buttons import Button, ButtonDict, ButtonGroup, PushButton
+from manim_utils.ui.buttons import (
+    Button,
+    ButtonDict,
+    ButtonGroup,
+    HighlightButton,
+    PushButton,
+)
 
 
 # ----------------------------------------------------------------------
@@ -754,3 +760,56 @@ def test_pushbutton_callback_on_push():
     assert len(transitions) == 2
     assert transitions[0] == (btn, "UNPUSHED", "PUSHED")
     assert transitions[1] == (btn, "PUSHED", "UNPUSHED")
+
+
+def test_pushbutton_content_opacity_after_transition():
+    pushed = m.Text("Pushed")
+    unpushed = m.Text("Unpushed").set_fill(opacity=0.5)
+    shape = m.Rectangle()
+    pb = PushButton(
+        shape=shape,
+        contents={
+            "PUSHED": pushed,
+            "UNPUSHED": unpushed,
+        },
+    )
+    assert pb.state == "UNPUSHED"
+    assert pb.content is unpushed
+    assert pb.content.fill_opacity == 0.5
+    pb.transition()
+    pb.swap_content()
+    assert pb.state == "PUSHED"
+    assert pb.content.text == pushed.text  # content is now a copy
+    assert pb.content.fill_opacity == 1
+    pb.transition().swap_content()
+    assert pb.state == "UNPUSHED"
+    assert pb.content.text == unpushed.text
+    assert pb.content.fill_opacity == 0.5
+
+
+# ----------------------------------------------------------------------
+# HighlightButton
+# ----------------------------------------------------------------------
+def test_highlightbutton_content_opacity_after_transition():
+    active = m.Text("Active")
+    inactive = m.Text("Inactive").set_fill(opacity=0.5)
+    shape = m.Rectangle()
+    hb = HighlightButton(
+        shape=shape,
+        contents={
+            "ACTIVE": active,
+            "INACTIVE": inactive,
+        },
+    )
+    assert hb.state == "INACTIVE"
+    assert hb.content is inactive
+    assert hb.content.fill_opacity == 0.5
+    hb.transition()
+    hb.swap_content()
+    assert hb.state == "ACTIVE"
+    assert hb.content.text == active.text  # content is now a copy
+    assert hb.content.fill_opacity == 1
+    hb.transition().swap_content()
+    assert hb.state == "INACTIVE"
+    assert hb.content.text == inactive.text
+    assert hb.content.fill_opacity == 0.5
