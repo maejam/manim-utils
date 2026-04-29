@@ -309,6 +309,9 @@ class Example(Scene):
 
 ```
 
+* `VIconText`: similar to `IconText`, but does not accept raster images as icons. Can be used in a vectorized context though, which makes ot suitable as a `Button` content for instance.  
+
+
 ### Groups  
 
 Simple (V)Groups-related utilities.
