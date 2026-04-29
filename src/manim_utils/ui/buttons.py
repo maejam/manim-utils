@@ -48,6 +48,10 @@ class Button(m.VGroup, ABC):
         - A single VMobject that will be used for every state.
         In any case, it is the user responsibility to call `swap_content` to update the
         displayed content.
+    content_alignment
+        The edge/corner where the content should be aligned inside the button.
+    content_buff
+        The buffer between the button edge and the content.
     kwargs
         Keyword arguments forwarded to the superclass VGroup.
 
@@ -92,6 +96,8 @@ class Button(m.VGroup, ABC):
             lambda button, from_state, to_state: None
         ),
         contents: Mapping[str, m.VMobject] | m.VMobject | None = None,
+        content_alignment: Vector3D = m.ORIGIN,
+        content_buff: float = 0.2,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -106,6 +112,9 @@ class Button(m.VGroup, ABC):
         self.state = first_state
 
         self._contents = self._get_contents(contents)
+        self._contents.move_to(self._shape, aligned_edge=content_alignment).shift(
+            -content_alignment * content_buff
+        )
         self._contents_template = (
             self._contents.copy().set_fill(opacity=0).set_stroke(opacity=0)
         )
