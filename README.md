@@ -10,6 +10,7 @@
   - [ui](#ui)
     - [Buttons](#Buttons)
   - [mobjects](#mobjects)
+  - [groups](#groups)
 
 ---
 
@@ -281,7 +282,7 @@ class ButtonGroupDemo(Scene):
 
 ### Mobjects  
 
-Simple (V)Mobjects utilmities.
+Simple (V)Mobjects-related utilities.
 
 * `IconText`: A simple Mobject combining an icon and a text. Handles svg and raster files to overcome the limitations of manim about svg files. Also, it resizes the raster images using Pillow directly because downsampling with manim `scale` method does not always give good results.
 
@@ -307,3 +308,10 @@ class Example(Scene):
         self.add(custom.next_to(icon_text, DOWN))
 
 ```
+
+### Groups  
+
+Simple (V)Groups-related utilities.
+
+* `GroupDict`: similar to `VDict` for Mobjects. Does not handle displaying keys.
+
