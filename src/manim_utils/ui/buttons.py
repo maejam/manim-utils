@@ -51,6 +51,30 @@ class Button(m.VGroup, ABC):
     kwargs
         Keyword arguments forwarded to the superclass VGroup.
 
+    Notes
+    -----
+    In order to keep the shape and the contents in sync with the button, "templates"
+    (copies with zero opacities) are added as submobjects. New states are then always
+    built from these templates, with opacities restored for all submobjects in the
+    families of the shape and the contents from copies on the instance (`Button._shape`
+    and `Button._contents`).
+    This means that no submobject should be added/removed to the base shape or the
+    contents through the lifetime of the button. Also, mutating the shape or the content
+    in a persistent way should be done on `Button._shape` and `Button._contents`
+    directly and will need a transition to be visible:
+
+    ```
+    # don't add/remove submobjects to _shape and _contents
+    btn._shape.add(Circle()) # WRONG
+
+    # mutating current content: GOOD but will not persist after transition
+    btn.content.set_fill(RED)
+
+    # mutating base content: GOOD, will persist, but requires transition to be visible
+    btn._contents["ACTIVE"].set_fill(RED)
+    btn.transition("ACTIVE")
+    ```
+
     """
 
     # NOTE: the goal of `_template` and `_contents_template` is to record all
@@ -182,18 +206,23 @@ class Button(m.VGroup, ABC):
         return self
 
     def _get_template(self) -> m.VMobject:
-        return (
-            self._template.copy()
-            .set_fill(opacity=self._shape.fill_opacity)
-            .set_stroke(opacity=self._shape.stroke_opacity)
-        )
+        template = self._template.copy()
+        # set all submobjects opacities to original values
+        for tmpl_submob, orig_submob in zip(
+            template.get_family(), self._shape.get_family(), strict=True
+        ):
+            tmpl_submob.set_fill(opacity=orig_submob.fill_opacity)
+            tmpl_submob.set_stroke(opacity=orig_submob.stroke_opacity)
+        return template
 
     def _get_contents_template(self) -> m.VDict:
         templates = self._contents_template.copy()
-        for state, content in templates.submob_dict.items():
-            content.set_fill(opacity=self._contents[state].fill_opacity).set_stroke(
-                opacity=self._contents[state].stroke_opacity
-            )
+        # set all submobjects opacities to original values
+        for tmpl_submob, orig_submob in zip(
+            templates.get_family(), self._contents.get_family(), strict=True
+        ):
+            tmpl_submob.set_fill(opacity=orig_submob.fill_opacity)
+            tmpl_submob.set_stroke(opacity=orig_submob.stroke_opacity)
         return templates
 
 
