@@ -449,7 +449,7 @@ class ButtonDict(m.VGroup):
 
 
 class PushButton(Button):
-    """A 2-state button: PUSHED/UNPUSHED with a bevel effect.
+    """A 2-state button: PUSHED/UNPUSHED with edge light effects.
 
     Default values are optimized for rectangular buttons. If needed, tweak by modifying
     the state dictionaries after instantiating the button. Example:
@@ -464,7 +464,8 @@ class PushButton(Button):
         "scale_factor": 1.0,
         "shadow_opacity": 0.25,
         "shadow_offset": 0.08,
-        "highlight_opacity": 0.15,
+        "highlight_interpolation_factor": 0.6,
+        "highlight_opacity": 0.8,
         "highlight_offset": 0.04,
         "inner_shadow_opacity": 0.0,
         "inner_shadow_offset": 0.0,
@@ -476,6 +477,7 @@ class PushButton(Button):
         "scale_factor": 0.96,
         "shadow_opacity": 0.0,
         "shadow_offset": 0.0,
+        "highlight_interpolation_factor": 0.0,
         "highlight_opacity": 0.0,
         "highlight_offset": 0.0,
         "inner_shadow_opacity": 0.30,
@@ -492,6 +494,16 @@ class PushButton(Button):
         shadow.set_fill(m.BLACK, opacity=state_dict["shadow_opacity"])
         shadow.shift(m.DR * state_dict["shadow_offset"])
 
+        # highlight
+        color = m.interpolate_color(
+            self._shape.fill_color,
+            m.WHITE,
+            state_dict["highlight_interpolation_factor"],
+        )
+        highlight = self._get_template().set_stroke(width=0)
+        highlight.set_fill(color, opacity=state_dict["highlight_opacity"])
+        highlight.shift(m.UL * state_dict["highlight_offset"])
+
         # body
         color = m.interpolate_color(
             self._shape.fill_color,
@@ -506,22 +518,17 @@ class PushButton(Button):
         inner_shadow.set_fill(m.BLACK, opacity=state_dict["inner_shadow_opacity"])
         inner_shadow.shift(m.UL * state_dict["inner_shadow_offset"])
 
-        # highlight
-        highlight = self._get_template().set_stroke(width=0)
-        highlight.set_fill(m.WHITE, opacity=state_dict["highlight_opacity"])
-        highlight.shift(m.UL * state_dict["highlight_offset"])
-
         # inner highlight
         inner_highlight = self._get_template().set_stroke(width=0)
         inner_highlight.set_fill(m.WHITE, opacity=state_dict["inner_highlight_opacity"])
-        inner_highlight.shift(m.UL * state_dict["inner_highlight_offset"])
+        inner_highlight.shift(m.DR * state_dict["inner_highlight_offset"])
 
         # contents
         contents = self._get_contents_template()
 
         # assemble and scale
         deco_group = m.VGroup(
-            shadow, body, inner_shadow, highlight, inner_highlight, contents
+            shadow, highlight, body, inner_shadow, inner_highlight, contents
         )
         deco_group.scale(state_dict["scale_factor"])
         # contents are scaled. Now remove them so that they do not morph with become
