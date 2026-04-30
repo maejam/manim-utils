@@ -457,16 +457,18 @@ class PushButton(Button):
 
     or subclass for a reusable solution.
 
+    All offsets are relative to the base button width.
+
     """
 
     UNPUSHED = {
         "color_interpolation_factor": 0.0,
         "scale_factor": 1.0,
         "shadow_opacity": 0.25,
-        "shadow_offset": 0.08,
+        "shadow_offset": 0.02,
         "highlight_interpolation_factor": 0.6,
         "highlight_opacity": 0.8,
-        "highlight_offset": 0.04,
+        "highlight_offset": 0.01,
         "inner_shadow_opacity": 0.0,
         "inner_shadow_offset": 0.0,
         "inner_highlight_opacity": 0.0,
@@ -481,18 +483,19 @@ class PushButton(Button):
         "highlight_opacity": 0.0,
         "highlight_offset": 0.0,
         "inner_shadow_opacity": 0.30,
-        "inner_shadow_offset": 0.06,
+        "inner_shadow_offset": 0.015,
         "inner_highlight_opacity": 0.15,
-        "inner_highlight_offset": 0.04,
+        "inner_highlight_offset": 0.01,
     }
 
     def _build_state(self, state_name: str) -> tuple[m.VGroup, m.VDict]:
         state_dict = self.states[state_name]
+        size = self._shape.width
 
         # shadow
         shadow = self._get_template().set_stroke(width=0)
         shadow.set_fill(m.BLACK, opacity=state_dict["shadow_opacity"])
-        shadow.shift(m.DR * state_dict["shadow_offset"])
+        shadow.shift(m.DR * state_dict["shadow_offset"] * size)
 
         # highlight
         color = m.interpolate_color(
@@ -502,7 +505,7 @@ class PushButton(Button):
         )
         highlight = self._get_template().set_stroke(width=0)
         highlight.set_fill(color, opacity=state_dict["highlight_opacity"])
-        highlight.shift(m.UL * state_dict["highlight_offset"])
+        highlight.shift(m.UL * state_dict["highlight_offset"] * size)
 
         # body
         color = m.interpolate_color(
@@ -516,12 +519,12 @@ class PushButton(Button):
         # inner shadow
         inner_shadow = self._get_template().set_stroke(width=0)
         inner_shadow.set_fill(m.BLACK, opacity=state_dict["inner_shadow_opacity"])
-        inner_shadow.shift(m.UL * state_dict["inner_shadow_offset"])
+        inner_shadow.shift(m.UL * state_dict["inner_shadow_offset"] * size)
 
         # inner highlight
         inner_highlight = self._get_template().set_stroke(width=0)
         inner_highlight.set_fill(m.WHITE, opacity=state_dict["inner_highlight_opacity"])
-        inner_highlight.shift(m.DR * state_dict["inner_highlight_offset"])
+        inner_highlight.shift(m.DR * state_dict["inner_highlight_offset"] * size)
 
         # contents
         contents = self._get_contents_template()
