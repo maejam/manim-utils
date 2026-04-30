@@ -101,11 +101,13 @@ def highlight_code(
     code_lines = code_string.splitlines()
 
     def prepare_line(line: str) -> MarkupText:
-        line = "." + line
         highlighted = highlight(line, lexer, formatter)
-        # Define a fallback color otherwise some styles are not rendered
+        # NOTE: add leading dot to preserve indentation when building the MarkupText.
+        # Needs to be done after highlighting to not mess with the lexer
+        dotted = "." + highlighted
+        # NOTE: Define a fallback color otherwise some styles are not rendered
         # properly with PangoMarkupFormatter (eg `algol`).
-        wrapped = f'<span foreground="#000000">{highlighted}</span>'
+        wrapped = f'<span foreground="#000000">{dotted}</span>'
         markup = MarkupText(wrapped, font=font, font_size=font_size)
         markup[0].set_opacity(0)
         return markup
