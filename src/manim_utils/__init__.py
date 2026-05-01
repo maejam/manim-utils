@@ -1,3 +1,4 @@
+from .animations import CallbackAnimation as CallbackAnimation
 from .animations import LazyAnimation as LazyAnimation
 from .animations import TrackedAnimationMixin as TrackedAnimationMixin
 from .code import get_styles_list as get_styles_list

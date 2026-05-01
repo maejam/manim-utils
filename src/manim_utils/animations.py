@@ -165,3 +165,50 @@ class TrackedAnimationMixin:
         super().interpolate(alpha)  # type: ignore[misc]
         if self.alpha_tracker is not None:
             self.alpha_tracker.set_value(alpha)
+
+
+class CallbackAnimation(m.Animation):
+    """A wrapper allowing a function call to be performed during an animation.
+
+    Unlike :class:`~.ApplyMethod`, this accepts all functions, not only mobject methods
+    (and mobject methods should be used with great care).
+
+    Heavily inspired (actually completely stolen) from @nikolaj on manim discord server.
+
+    Parameters
+    ----------
+    callback
+        The function that will be called during the animation.
+    args
+        Any positional arguments to be passed when applying the method.
+    delay
+        Defines the delay after which the function is called. This time is relative to
+        the total duration of the animation (independently of any rate functions).
+            0.0 = immediately when this animation starts.
+            1.0 = at the very end.
+    kwargs
+        Any keyword arguments passed to :class:`~.Animation`.
+
+    """
+
+    def __init__(
+        self,
+        callback: Callable[..., Any],
+        *args: Any,
+        delay: float = 0.0,
+        **kwargs: Any,
+    ) -> None:
+        self._callback = callback
+        self._args = args
+        self._delay = delay
+        self._called = False
+        super().__init__(None, **kwargs)
+
+    def begin(self) -> None:
+        self._called = False
+        super().begin()
+
+    def interpolate(self, alpha: float) -> None:
+        if not self._called and alpha >= self._delay:
+            self._callback(*self._args)
+            self._called = True
