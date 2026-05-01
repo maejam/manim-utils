@@ -1,9 +1,12 @@
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Self, cast
 
 import manim as m
 import numpy as np
+from manim.typing import Point3DLike
+
+from manim_utils.animations import CallbackAnimation
 
 
 class Cursor(m.VMobject):
@@ -18,8 +21,9 @@ class Cursor(m.VMobject):
     DEFAULT_PATH
         Default directory path to scan for cursor SVG files. The library comes with
         40+ cursor shapes in this default path.
-    click
-        Path to a click sound file. Usage in scenes: `self.add_sound(Cursor.click)`.
+    click_sound
+        Path to a click sound file. Usage in scenes:
+        `self.add_sound(Cursor.click_sound)` or through the :meth:`click` method.
     cursors
         Dictionary of available cursor shapes. Identifiers are the file names
         capitalized.
@@ -42,7 +46,7 @@ class Cursor(m.VMobject):
     """
 
     DEFAULT_PATH: Path = Path(__file__).parent / "assets/cursors/"
-    click: str = str(Path(__file__).parent / "assets/click.wav")
+    click_sound: str = str(Path(__file__).parent / "assets/click.wav")
 
     def __init__(
         self,
@@ -143,3 +147,47 @@ class Cursor(m.VMobject):
     def scale(self, scale_factor: float, **kwargs: Any) -> Self:  # type: ignore[override]
         self._scale_factor *= scale_factor
         return super().scale(scale_factor, **kwargs)
+
+    def click(
+        self,
+        target: Point3DLike | m.Mobject,
+        callback: Callable[..., Any] | None = None,
+        animation: Any = None,
+        **kwargs: Any,
+    ) -> m.Succession:
+        """Click a target.
+
+        Moves the cursor to a given mobject or point, run a callback function and play
+        an animation that is the result of the click.
+
+        Parameters
+        ----------
+        target
+            The Mobject or point to move the cursor to.
+        callback
+            A callback function that will be played after the cursor has moved to the
+            target, but before the animation triggered by the click.
+            A typical use-case is to play a click sound.
+        animation
+            The animation that will be played as a result of the click. Leave the `None`
+            default to play no animation.
+        **kwargs
+            Keyword arguments passed to the generated Succession object.
+
+        Returns
+        -------
+        Succession
+            The Succession containing the animations ready to be played.
+
+        """
+        animations = [cast(m.Animation, self.animate.move_to(target))]
+
+        if callback is not None:
+            animations.append(
+                CallbackAnimation(callback=callback, delay=0.0, run_time=0.01)
+            )
+
+        if animation is not None:
+            animations.append(animation)
+
+        return m.Succession(*animations, **kwargs)
