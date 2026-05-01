@@ -1,10 +1,11 @@
 from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import Any, Self, cast
+from typing import Any, Self
 
 import manim as m
 import numpy as np
 from manim.typing import Point3DLike
+from manim.utils.rate_functions import RateFunction
 
 from manim_utils.animations import CallbackAnimation
 
@@ -40,6 +41,11 @@ class Cursor(m.VMobject):
         Defaults to 4.0.
     fade_duration
         Duration of the fade-out effect in seconds. Defaults to 1.0.
+    speed
+        The speed of the cursor in munits per second. Defaults to 2.0.
+        Only applied in internal methods such as :meth:`click`.
+    rate_func
+        The rate function to apply to the cursor movements in internal methods.
     **kwargs
         Additional keyword arguments passed to the parent `VMobject`.
 
@@ -51,8 +57,10 @@ class Cursor(m.VMobject):
     def __init__(
         self,
         svg_paths: Iterable[Path | str] = (),
-        idle_duration: float | None = 4,
-        fade_duration: float = 1,
+        idle_duration: float | None = 4.0,
+        fade_duration: float = 1.0,
+        speed: float = 2.0,
+        rate_func: RateFunction = m.smooth,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -80,6 +88,8 @@ class Cursor(m.VMobject):
         self._fade_duration = fade_duration
         self._idle_time = m.ValueTracker(0)
         self._last_pos = self.get_center()
+        self.speed = speed
+        self.rate_func = rate_func
         self.become(m.SVGMobject(self.cursors["LEFT_PTR"]))
         self.set_stroke(width=4)
         self._scale_factor = 1.0
@@ -180,7 +190,18 @@ class Cursor(m.VMobject):
             The Succession containing the animations ready to be played.
 
         """
-        animations = [cast(m.Animation, self.animate.move_to(target))]
+        # compute run_time based on distance to move for
+        if isinstance(target, m.Mobject):
+            target = target.get_center()
+        run_time = np.linalg.norm(self.get_center() - target) / self.speed
+
+        # prevent cursor from fading-out
+        self.suspend_updating()
+        self.generate_target()
+        self.target.move_to(target)  # pyright: ignore[reportOptionalMemberAccess]
+        move_anim = m.MoveToTarget(self, run_time=run_time, rate_func=self.rate_func)
+        animations: list[m.Animation] = [move_anim]
+        self.resume_updating()
 
         if callback is not None:
             animations.append(
