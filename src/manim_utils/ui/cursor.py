@@ -4,6 +4,7 @@ from typing import Any, Self
 
 import manim as m
 import numpy as np
+from manim.mobject.mobject import _AnimationBuilder
 from manim.typing import Point3DLike
 from manim.utils.rate_functions import RateFunction
 
@@ -28,16 +29,13 @@ class Cursor(m.VMobject):
     cursors
         Dictionary of available cursor shapes. Identifiers are the file names
         capitalized.
-    idle_duration
-        Time in seconds of inactivity before the fade-out process begins. Set to `None`
-        to disable the automatic fade-out.
 
     Parameters
     ----------
     svg_paths
         Additional directories to scan for cursor SVG files. Defaults to empty tuple.
     idle_duration
-        Seconds of inactivity before fading starts. If None, fading is disabled.
+        Seconds of inactivity before fading starts. If negative, fading is disabled.
         Defaults to 4.0.
     fade_duration
         Duration of the fade-out effect in seconds. Defaults to 1.0.
@@ -49,6 +47,15 @@ class Cursor(m.VMobject):
     **kwargs
         Additional keyword arguments passed to the parent `VMobject`.
 
+    Note
+    ----
+    Moving the cursor with the `.animate` syntax or through the :meth:`click` method
+    will set its opacity to 1 and reset the idle timer. Moving it any other way (e.g.
+    through an animation such as `MoveToTarget`, or a simple unnanimated `move_to`) will
+    keep its opacity as it was and will not reset the timer. This was initially done to
+    circumvent a difficulty with the way interpolation works, but can actually be
+    considered a feature.
+
     """
 
     DEFAULT_PATH: Path = Path(__file__).parent / "assets/cursors/"
@@ -57,7 +64,7 @@ class Cursor(m.VMobject):
     def __init__(
         self,
         svg_paths: Iterable[Path | str] = (),
-        idle_duration: float | None = 4.0,
+        idle_duration: float = 4.0,
         fade_duration: float = 1.0,
         speed: float = 2.0,
         rate_func: RateFunction = m.smooth,
@@ -85,45 +92,50 @@ class Cursor(m.VMobject):
                 self.cursors[key] = svg_file
 
         self.idle_duration = idle_duration
-        self._fade_duration = fade_duration
+        self.fade_duration = fade_duration
         self._idle_time = m.ValueTracker(0)
         self._last_pos = self.get_center()
         self.speed = speed
         self.rate_func = rate_func
         self.become(m.SVGMobject(self.cursors["LEFT_PTR"]))
-        self.set_stroke(width=4)
+        self.set_stroke(width=2)
         self._scale_factor = 1.0
-        self.scale(0.2)
+        self.scale(0.1)
 
     @property
-    def idle_duration(self) -> float:
-        if self._idle_duration is None:
-            raise ValueError("No idle duration set on this cursor.")
-        return self._idle_duration
-
-    @idle_duration.setter
-    def idle_duration(self, duration: float | None) -> None:
-        self.remove_updater(self._idle_fade)
-        if duration is not None:
+    def animate(self) -> _AnimationBuilder | Self:
+        # NOTE: we override .animate because otherwise opacity would be interpolated
+        # with movement, making the cursor reappear progressively. Opacity needs to be
+        # set to 1 BEFORE the animation even starts
+        self.set_opacity(1)
+        if self.idle_duration > 0:
+            self._idle_time.set_value(0)
             self.add_updater(self._idle_fade)
-        self._idle_duration = duration
+        return super().animate
 
     def _idle_fade(self, mob: m.Mobject, dt: float) -> None:
-        if not np.allclose(self.get_center(), self._last_pos):
-            self._idle_time.set_value(0)
-            self._last_pos = self.get_center()
-
         self._idle_time.increment_value(dt)
+
+        # keep opacity 1 while cursor is moving and reset timer
+        if not np.array_equal(self.get_center(), self._last_pos):
+            self._last_pos = self.get_center()
+            self._idle_time.set_value(0)
+            self.set_opacity(1)
+            return
+
+        # progressively fadeout if timer is above threshold
         if self._idle_time.get_value() > self.idle_duration:
             new_opacity = max(
                 0,
                 1
                 - (self._idle_time.get_value() - self.idle_duration)
-                / self._fade_duration,
+                / self.fade_duration,
             )
             self.set_opacity(new_opacity)
-        else:
-            self.set_opacity(1)
+
+        # remove updater as soon as cursor opacity is 0
+        if self.fill_opacity == 0:
+            self.remove_updater(self._idle_fade)
 
     def set_cursor(self, target: str) -> Self:
         """Switch the cursor to a different shape.
@@ -190,18 +202,20 @@ class Cursor(m.VMobject):
             The Succession containing the animations ready to be played.
 
         """
-        # compute run_time based on distance to move for
         if isinstance(target, m.Mobject):
             target = target.get_center()
-        run_time = np.linalg.norm(self.get_center() - target) / self.speed
 
-        # prevent cursor from fading-out
-        self.suspend_updating()
+        self.set_opacity(1)
+        if self.idle_duration > 0:
+            self._idle_time.set_value(0)
+            self.add_updater(self._idle_fade)
+
+        # compute run_time based on distance to move for
+        run_time = np.linalg.norm(self.get_center() - target) / self.speed
         self.generate_target()
         self.target.move_to(target)  # pyright: ignore[reportOptionalMemberAccess]
         move_anim = m.MoveToTarget(self, run_time=run_time, rate_func=self.rate_func)
         animations: list[m.Animation] = [move_anim]
-        self.resume_updating()
 
         if callback is not None:
             animations.append(

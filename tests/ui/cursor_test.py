@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import manim as m
 import numpy as np
 import pytest
 
@@ -40,7 +41,7 @@ def cursor_no_idle(cursor_instance):
     """
     A cursor instance with idle fading disabled.
     """
-    cursor_instance.idle_duration = None
+    cursor_instance.idle_duration = -1
     return cursor_instance
 
 
@@ -67,7 +68,7 @@ def test_cursor_initialization_missing_required_file(mock_svg_files, tmp_path):
         pytest.raises(KeyError, match="LEFT_PTR"),
         patch.object(Cursor, "DEFAULT_PATH", bad_dir),
     ):
-        Cursor(svg_paths=[], idle_duration=None)
+        Cursor(svg_paths=[], idle_duration=-1)
 
 
 def test_set_cursor_valid(cursor_instance):
@@ -96,28 +97,14 @@ def test_idle_duration_property_setter(cursor_instance):
     assert cursor_instance.idle_duration == 5.0
 
 
-def test_idle_duration_disable_and_enable(cursor_instance):
-    """Test disabling and re-enabling idle duration."""
-    # Disable
-    cursor_instance.idle_duration = None
-    with pytest.raises(ValueError, match="No idle duration set on this cursor"):
-        _ = cursor_instance.idle_duration
-
-    # Re-enable
-    cursor_instance.idle_duration = 3.0
-    assert cursor_instance.idle_duration == 3.0
-
-
 def test_scale_accumulation(cursor_instance):
     """Test that scale factors accumulate correctly."""
-    initial_scale = cursor_instance._scale_factor
-
-    # base factor = 0.2
+    # base factor = 0.1
     cursor_instance.scale(2.0)
-    assert cursor_instance._scale_factor == 0.4
+    assert cursor_instance._scale_factor == 0.2
 
     cursor_instance.scale(0.5)
-    assert cursor_instance._scale_factor == 0.2
+    assert cursor_instance._scale_factor == 0.1
 
 
 def test_scale_returns_self(cursor_instance):
@@ -128,31 +115,23 @@ def test_scale_returns_self(cursor_instance):
 
 def test_idle_fade_logic_resets_on_move(cursor_instance):
     """Test that moving the cursor resets the idle timer."""
-    cursor_instance._idle_duration = 100.0
-
     cursor_instance._idle_time.set_value(5.0)
-    cursor_instance._last_pos = np.array([0.0, 0.0, 0.0])
-
-    # Simulate a position change
-    new_pos = np.array([1.0, 1.0, 0.0])
-
-    # Mock the get_center to return the new position
-    with patch.object(cursor_instance, "get_center", return_value=new_pos):
-        cursor_instance._idle_fade(cursor_instance, 0.1)
-
-    # The timer should have been reset to 0 because position changed
-    # but dt is added
-    assert cursor_instance._idle_time.get_value() == 0.1
+    cursor_instance.animate.shift(m.RIGHT)
+    assert cursor_instance._idle_time.get_value() == 0.0
 
 
 def test_idle_fade_logic_fades_when_stationary(cursor_instance):
     """Test that opacity decreases when stationary past idle_duration."""
+    assert cursor_instance._idle_fade not in cursor_instance.updaters
+    cursor_instance.animate.shift(m.LEFT)
+    assert cursor_instance._idle_fade in cursor_instance.updaters
     cursor_instance.idle_duration = 1.0
-    cursor_instance._fade_duration = 1.0
+    cursor_instance.fade_duration = 1.0
 
     # Set idle time to exactly the threshold
-    cursor_instance._idle_time.set_value(1.0)
     cursor_instance._last_pos = np.array([0.0, 0.0, 0.0])
+    cursor_instance.move_to((0, 0, 0))
+    cursor_instance._idle_time.set_value(1.0)
 
     # Advance time by 0.5 seconds (past threshold)
     cursor_instance._idle_fade(cursor_instance, 0.5)
