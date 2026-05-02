@@ -115,9 +115,9 @@ def test_scale_returns_self(cursor_instance):
 
 def test_idle_fade_logic_resets_on_move(cursor_instance):
     """Test that moving the cursor resets the idle timer."""
-    cursor_instance._idle_time.set_value(5.0)
+    cursor_instance._idle_time = 5.0
     cursor_instance.animate.shift(m.RIGHT)
-    assert cursor_instance._idle_time.get_value() == 0.0
+    assert cursor_instance._idle_time == 0.0
 
 
 def test_idle_fade_logic_fades_when_stationary(cursor_instance):
@@ -131,13 +131,13 @@ def test_idle_fade_logic_fades_when_stationary(cursor_instance):
     # Set idle time to exactly the threshold
     cursor_instance._last_pos = np.array([0.0, 0.0, 0.0])
     cursor_instance.move_to((0, 0, 0))
-    cursor_instance._idle_time.set_value(1.0)
+    cursor_instance._idle_time = 1.0
 
     # Advance time by 0.5 seconds (past threshold)
     cursor_instance._idle_fade(cursor_instance, 0.5)
 
     # Opacity should be 0.5 (1 - (1.5 - 1.0)/1.0)
-    assert cursor_instance._idle_time.get_value() == 1.5
+    assert cursor_instance._idle_time == 1.5
     assert cursor_instance.fill_opacity == 0.5
     assert cursor_instance.stroke_opacity == 0.5
 
