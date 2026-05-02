@@ -93,7 +93,7 @@ class Cursor(m.VMobject):
 
         self.idle_duration = idle_duration
         self.fade_duration = fade_duration
-        self._idle_time = 0.0
+        self._idle_timer = 0.0
         self._last_pos = self.get_center()
         self.speed = speed
         self.rate_func = rate_func
@@ -109,25 +109,25 @@ class Cursor(m.VMobject):
         # set to 1 BEFORE the animation even starts
         self.set_opacity(1)
         if self.idle_duration > 0:
-            self._idle_time = 0.0
+            self._idle_timer = 0.0
             self.add_updater(self._idle_fade)
         return super().animate
 
     def _idle_fade(self, mob: m.Mobject, dt: float) -> None:
-        self._idle_time += dt
+        self._idle_timer += dt
 
         # keep opacity 1 while cursor is moving and reset timer
         if not np.array_equal(self.get_center(), self._last_pos):
             self._last_pos = self.get_center()
-            self._idle_time = 0.0
+            self._idle_timer = 0.0
             self.set_opacity(1)
             return
 
         # progressively fadeout if timer is above threshold
-        if self._idle_time > self.idle_duration:
+        if self._idle_timer > self.idle_duration:
             new_opacity = max(
                 0,
-                1 - (self._idle_time - self.idle_duration) / self.fade_duration,
+                1 - (self._idle_timer - self.idle_duration) / self.fade_duration,
             )
             self.set_opacity(new_opacity)
 
@@ -161,7 +161,7 @@ class Cursor(m.VMobject):
             raise ValueError(f"Unknown cursor: {target}.")
         self.match_points(m.SVGMobject(self.cursors[target]).move_to(self))
         super().scale(self._scale_factor)
-        self._idle_time = 0.0
+        self._idle_timer = 0.0
         return self
 
     def scale(self, scale_factor: float, **kwargs: Any) -> Self:  # type: ignore[override]
@@ -205,7 +205,7 @@ class Cursor(m.VMobject):
 
         self.set_opacity(1)
         if self.idle_duration > 0:
-            self._idle_time = 0.0
+            self._idle_timer = 0.0
             self.add_updater(self._idle_fade)
 
         # compute run_time based on distance to move for
