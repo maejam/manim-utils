@@ -1,10 +1,9 @@
-import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
+import pygments
 from manim import ManimColor
 from manim.mobject.text.text_mobject import MarkupText
-from pygments import highlight
 from pygments.formatters.pangomarkup import PangoMarkupFormatter
 from pygments.lexers import get_lexer_by_name, guess_lexer, guess_lexer_for_filename
 from pygments.styles import get_all_styles
@@ -56,6 +55,12 @@ def highlight_code(
     rendered.
     * `bgcolor`: the background color as defined by the chosen style.
 
+    Notes
+    -----
+    Tags in a string (e.g. `"<script>alert(42)</script>"`) will result in a ValueError
+    raised by MarkupText ("ValueError: Unknown tag 'script' on line x char x").
+    The solution is to use another lexer for that one line (e.g. javascript).
+
     Examples
     --------
     >>> import manim as m
@@ -97,14 +102,41 @@ def highlight_code(
 
     formatter = PangoMarkupFormatter(style=style)
     code_string = code_string.expandtabs(tabsize=tab_width).lstrip("\n")
-    code_string = textwrap.dedent(code_string)
-    code_lines = code_string.splitlines()
+
+    # Process token by token to preserve multi-line tokens formatting (eg docstrings)
+    highlighted = []
+    current_line = ""
+
+    for token_type, value in pygments.lex(code_string, lexer):
+        if "\n" not in value:
+            current_line += pygments.format([(token_type, value)], formatter)
+
+        elif value == "\n":
+            highlighted.append(current_line)
+            current_line = ""
+
+        else:
+            # Multiline token
+            lines = value.splitlines()
+            # Prepend pending content (indentation) to the first line of the token
+            if current_line:
+                first_line = pygments.format([(token_type, lines[0])], formatter)
+                lines[0] = current_line + first_line
+                current_line = ""
+            # Append all parts except the last as complete lines
+            for line in lines[:-1]:
+                highlighted.append(line)
+            # The last part starts the next line
+            current_line += pygments.format([(token_type, lines[-1])], formatter)
+
+    # Final flush
+    if current_line.strip():
+        highlighted.append(current_line)
 
     def prepare_line(line: str) -> MarkupText:
-        highlighted = highlight(line, lexer, formatter)
         # NOTE: add leading dot to preserve indentation when building the MarkupText.
         # Needs to be done after highlighting to not mess with the lexer
-        dotted = "." + highlighted
+        dotted = "." + line
         # NOTE: Define a fallback color otherwise some styles are not rendered
         # properly with PangoMarkupFormatter (eg `algol`).
         wrapped = f'<span foreground="#000000">{dotted}</span>'
@@ -112,7 +144,7 @@ def highlight_code(
         markup[0].set_opacity(0)
         return markup
 
-    highlighted_code_lines = map(prepare_line, code_lines)
+    highlighted_code_lines = map(prepare_line, highlighted)
     return HighlightedCode(
         list(highlighted_code_lines), ManimColor(formatter.style.background_color)
     )
