@@ -4,7 +4,6 @@ from typing import Any, Self
 
 import manim as m
 import numpy as np
-from manim.mobject.mobject import _AnimationBuilder
 from manim.typing import Point3DLike
 from manim.utils.rate_functions import RateFunction
 
@@ -35,8 +34,7 @@ class Cursor(m.VMobject):
     svg_paths
         Additional directories to scan for cursor SVG files. Defaults to empty tuple.
     idle_duration
-        Seconds of inactivity before fading starts. If negative, fading is disabled.
-        Defaults to 4.0.
+        Seconds of inactivity before fading starts. Defaults to 4.0.
     fade_duration
         Duration of the fade-out effect in seconds. Defaults to 1.0.
     speed
@@ -49,12 +47,9 @@ class Cursor(m.VMobject):
 
     Note
     ----
-    Moving the cursor with the `.animate` syntax or through the :meth:`click` method
-    will set its opacity to 1 and reset the idle timer. Moving it any other way (e.g.
-    through an animation such as `MoveToTarget`, or a simple unnanimated `move_to`) will
-    keep its opacity as it was and will not reset the timer. This was initially done to
-    circumvent a difficulty with the way interpolation works, but can actually be
-    considered a feature.
+    The opacity timer will only be managed correctly when using the :meth:`click`
+    method. Moving the cursor any other way, through an Animation class or the
+    `.animate` syntax will leave the opacity and the timer as they are.
 
     """
 
@@ -101,50 +96,31 @@ class Cursor(m.VMobject):
         self.set_stroke(width=2)
         self._scale_factor = 1.0
         self.scale(0.1)
-
-    @property
-    def animate(self) -> _AnimationBuilder | Self:
-        # NOTE: we override .animate because otherwise opacity would be interpolated
-        # with movement, making the cursor reappear progressively. Opacity needs to be
-        # set to 1 BEFORE the animation even starts
-        self.set_opacity(1)
-        if self.idle_duration > 0:
-            self._idle_timer = 0.0
-            self.add_updater(self._idle_fade)
-        return super().animate
+        self.add_updater(self._idle_fade)
 
     def _idle_fade(self, mob: m.Mobject, dt: float) -> None:
         self._idle_timer += dt
 
-        # keep opacity 1 while cursor is moving and reset timer
-        if not np.array_equal(self.get_center(), self._last_pos):
-            self._last_pos = self.get_center()
-            self._idle_timer = 0.0
-            self.set_opacity(1)
-            return
-
         # progressively fadeout if timer is above threshold
         if self._idle_timer > self.idle_duration:
             new_opacity = max(
-                0,
-                1 - (self._idle_timer - self.idle_duration) / self.fade_duration,
+                0.0,
+                1.0 - (self._idle_timer - self.idle_duration) / self.fade_duration,
             )
             self.set_opacity(new_opacity)
 
-        # remove updater as soon as cursor opacity is 0
-        if self.fill_opacity == 0:
-            self.remove_updater(self._idle_fade)
-
-    def set_cursor(self, target: str) -> Self:
+    def set_shape(self, target: str, reset_timer: bool = True) -> Self:
         """Switch the cursor to a different shape.
 
-        Replaces the current visual representation with the specified cursor type and
+        Replaces the current visual representation with the specified cursor shape and
         resets the idle timer.
 
         Parameters
         ----------
         target
             The uppercase identifier of the target cursor (e.g., "HAND2").
+        reset_timer
+            If True, the idle timer will be reset to 0.0 and the opacity to 1.
 
         Returns
         -------
@@ -161,7 +137,9 @@ class Cursor(m.VMobject):
             raise ValueError(f"Unknown cursor: {target}.")
         self.match_points(m.SVGMobject(self.cursors[target]).move_to(self))
         super().scale(self._scale_factor)
-        self._idle_timer = 0.0
+        if reset_timer:
+            self.set_opacity(1)
+            self._idle_timer = 0.0
         return self
 
     def scale(self, scale_factor: float, **kwargs: Any) -> Self:  # type: ignore[override]
@@ -178,15 +156,17 @@ class Cursor(m.VMobject):
         """Click a target.
 
         Moves the cursor to a given mobject or point, run a callback function and play
-        an animation that is the result of the click.
+        an animation that is the result of the click. The opacity will be set to 1 and
+        the timer will be set to include the total run time of the first animation
+        (moving to the target).
 
         Parameters
         ----------
         target
             The Mobject or point to move the cursor to.
         callback
-            A callback function that will be played after the cursor has moved to the
-            target, but before the animation triggered by the click.
+            An optional callback function that will be played after the cursor has moved
+            to the target, but before the animation triggered by the click.
             A typical use-case is to play a click sound.
         animation
             The animation that will be played as a result of the click. Leave the `None`
@@ -203,16 +183,19 @@ class Cursor(m.VMobject):
         if isinstance(target, m.Mobject):
             target = target.get_center()
 
-        self.set_opacity(1)
-        if self.idle_duration > 0:
-            self._idle_timer = 0.0
-            self.add_updater(self._idle_fade)
-
         # compute run_time based on distance to move for
-        run_time = np.linalg.norm(self.get_center() - target) / self.speed
+        run_time = float(np.linalg.norm(self.get_center() - target) / self.speed)
+        self.set_opacity(1)
+        self._idle_timer = -run_time
+
         self.generate_target()
         self.target.move_to(target)  # pyright: ignore[reportOptionalMemberAccess]
-        move_anim = m.MoveToTarget(self, run_time=run_time, rate_func=self.rate_func)
+        move_anim = m.MoveToTarget(
+            self,
+            run_time=run_time,
+            rate_func=self.rate_func,
+            suspend_mobject_updating=False,
+        )
         animations: list[m.Animation] = [move_anim]
 
         if callback is not None:
