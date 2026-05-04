@@ -9,6 +9,7 @@
   - [animations](#animations)
   - [ui](#ui)
     - [Buttons](#Buttons)
+    - [Cursor](#Cursor)
   - [groups](#groups)
 
 ---
@@ -91,7 +92,8 @@ See the docstrings in `manim_utils.code` for more details.
 
 ### Animations  
 
-Utilities related to animations.
+Utilities related to animations.  
+
 * `LazyAnimation`: an Animation wrapper that builds the animation only when it is played. Useful when the set of mobjects to animate or the animation parameters may change dynamically between the moment the animation is built and the moment it is played.
 
 ```python
@@ -100,7 +102,7 @@ from manim import *
 from manim_utils import LazyAnimation
 
 
-class LazyAnimationScene(Scene):
+class LazyAnimationDemo(Scene):
     def construct(self) -> None:
         grp = VGroup(Circle(color=RED), Dot(color=GREEN), Rectangle(color=BLUE))
         self.add(grp.arrange(RIGHT))
@@ -130,7 +132,7 @@ from manim import *
 from manim_utils import TrackedAnimationMixin
 
 
-class TrackedAnimationScene(Scene):
+class TrackedAnimationDemo(Scene):
     def construct(self) -> None:
         c = Circle()
 
@@ -161,6 +163,9 @@ class TrackedAnimationScene(Scene):
         print(anim2._status)
 
 ```  
+
+* `CallBackAnimation`: a wrapper allowing a function call to be performed during an animation.
+Shamelessly stolen for @nikolaj on manim's discord server!
 
 
 ### UI  
@@ -280,6 +285,51 @@ class ButtonGroupDemo(Scene):
 * `ButtonDict`: a VGroup of Buttons with a group level callback function and string labels access.  
 
 
+#### Cursor  
+
+A mouse cursor with assets management and auto-fadeout functionality.
+
+```python
+
+from manim import *
+from manim.utils.rate_functions import ease_in_out_quad
+
+from manim_utils.ui import Cursor
+
+
+class CursorDemo(Scene):
+    def construct(self) -> None:
+        cursor = (
+            Cursor(
+                idle_duration=1, fade_duration=1, rate_func=ease_in_out_quad, speed=2
+            )
+            .set_fill(BLACK)
+            .set_stroke(WHITE)
+        )
+        button1 = Rectangle().to_corner(UL)
+        button2 = Rectangle().to_corner(UR)
+
+        self.add(button1, button2, cursor)
+        self.wait()
+        self.play(
+            cursor.click(
+                button1,  # target
+                lambda: self.add_sound(cursor.click_sound),  # optional callback
+                button1.animate.scale(0.5),  # optional animation triggered by the click
+            )
+        )
+        # cursor does not move for more than `idle_duration` => Fades out in
+        # `fade_duration` seconds
+        self.wait(2)
+        cursor.set_shape(
+            "HAND2",
+            reset_timer=False,  # True by default
+        )
+        self.play(cursor.click(button2))  # only target
+        self.wait()
+```  
+
+
 ### Groups  
 
 Simple (V)Groups-related utilities.
@@ -294,7 +344,7 @@ from manim import *
 from manim_utils import IconText
 
 
-class Example(Scene):
+class IconTextDemo(Scene):
     def construct(self):
         icon_text = IconText(Circle(fill_color=RED, fill_opacity=0.2), "Hello")
         self.add(icon_text)
