@@ -1,3 +1,4 @@
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -25,6 +26,7 @@ def highlight_code(
     tab_width: int = 4,
     font: str = "Monospace",
     font_size: int = 22,
+    dedent: bool = True,
 ) -> HighlightedCode:
     """Highlight a piece of code with the pygments library.
 
@@ -47,6 +49,8 @@ def highlight_code(
         The font to be used.
     font_size
         The size of the font to be used
+    dedent
+        Whether the code should be dedented or not. Defaults to True.
 
     Returns
     -------
@@ -102,6 +106,8 @@ def highlight_code(
 
     formatter = PangoMarkupFormatter(style=style)
     code_string = code_string.expandtabs(tabsize=tab_width).lstrip("\n")
+    if dedent:
+        code_string = textwrap.dedent(code_string)
 
     # Process token by token to preserve multi-line tokens formatting (eg docstrings)
     highlighted = []
@@ -118,14 +124,20 @@ def highlight_code(
         else:
             # Multiline token
             lines = value.splitlines()
+
             # Prepend pending content (indentation) to the first line of the token
             if current_line:
                 first_line = pygments.format([(token_type, lines[0])], formatter)
-                lines[0] = current_line + first_line
+                first_line = current_line + first_line
+                highlighted.append(first_line)
                 current_line = ""
-            # Append all parts except the last as complete lines
-            for line in lines[:-1]:
-                highlighted.append(line)
+            else:
+                highlighted.append(pygments.format([(token_type, lines[0])], formatter))
+
+            # Append all middle lines as complete lines
+            for line in lines[1:-1]:
+                highlighted.append(pygments.format([(token_type, line)], formatter))
+
             # The last part starts the next line
             current_line += pygments.format([(token_type, lines[-1])], formatter)
 
