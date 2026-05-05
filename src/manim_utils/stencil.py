@@ -64,7 +64,10 @@ class Stencil(m.VMobject):
         """Keep the stencil aligned with the wrapped Mobject."""
         if self._wrapped is None:
             return
-        self._shape.surround(self._wrapped, stretch=True, buff=1 * Pixels)
+        r = m.SurroundingRectangle(
+            self._wrapped, buff=self._wrapped.stroke_width / 200 + 2 * Pixels
+        )
+        self._shape.match_points(r)
         self._make_stencil()
 
     @property
