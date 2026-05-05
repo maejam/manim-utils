@@ -3,15 +3,17 @@ import tempfile
 from collections.abc import ItemsView, Iterable, KeysView, Mapping, ValuesView
 from pathlib import Path
 from types import NoneType
-from typing import Any, Self
+from typing import Any, Generic, Self, TypeVar
 
 import manim as m
 from manim.typing import Vector3DLike
 from manim.utils.unit import Pixels
 from PIL import Image
 
+T = TypeVar("T", bound=m.Mobject)
 
-class GroupDict(m.Group):
+
+class GroupDict(m.Group, Generic[T]):
     """A VDict equivalent for Mobjects.
 
     Allows string labels access to submobjects. Does not implement displaying the keys.
@@ -25,13 +27,11 @@ class GroupDict(m.Group):
 
     def __init__(
         self,
-        mapping_or_iterable: Mapping[str, m.Mobject]
-        | Iterable[tuple[str, m.Mobject]]
-        | None = None,
+        mapping_or_iterable: Mapping[str, T] | Iterable[tuple[str, T]] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._data: dict[str, m.Mobject] = {}
+        self._data: dict[str, T] = {}
 
         if mapping_or_iterable is not None:
             for k, v in dict(mapping_or_iterable).items():
@@ -42,9 +42,7 @@ class GroupDict(m.Group):
 
     def add(  # type: ignore[override]
         self,
-        mapping_or_iterable: Mapping[str, m.Mobject]
-        | Iterable[tuple[str, m.Mobject]]
-        | None = None,
+        mapping_or_iterable: Mapping[str, T] | Iterable[tuple[str, T]] | None = None,
     ) -> Self:
         if not isinstance(
             mapping_or_iterable, (Mapping, Iterable, NoneType)
@@ -62,14 +60,14 @@ class GroupDict(m.Group):
         del self[key]
         return self
 
-    def __setitem__(self, key: str, value: m.Mobject) -> None:
+    def __setitem__(self, key: str, value: T) -> None:
         if key in self._data:
             old_value = self._data[key]
             super().remove(old_value)
         super().add(value)
         self._data[key] = value
 
-    def __getitem__(self, key: str) -> m.Mobject:
+    def __getitem__(self, key: str) -> T:
         if key not in self._data:
             raise KeyError(f"Key {key!r} not found in GroupDict.")
         return self._data[key]
@@ -87,10 +85,10 @@ class GroupDict(m.Group):
     def keys(self) -> KeysView[str]:
         return self._data.keys()
 
-    def values(self) -> ValuesView[m.Mobject]:
+    def values(self) -> ValuesView[T]:
         return self._data.values()
 
-    def items(self) -> ItemsView[str, m.Mobject]:
+    def items(self) -> ItemsView[str, T]:
         return self._data.items()
 
 
