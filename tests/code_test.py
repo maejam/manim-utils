@@ -245,8 +245,32 @@ def test_background_color_extracted():
 
 def test_tab_expansion():
     """Test that tabs are expanded correctly."""
-    code = "\tx\t=\t1"
+    code = "x\t=\t1"
     result = highlight_code(code_string=code, language="python", tab_width=4)
+    plain = get_plain_lines(result)
+
+    assert len(result.lines) == 1
+    assert "\t" not in plain[0]
+    assert plain == ["x   =   1"]
+
+
+def test_dedent_True():
+    code = "\tx\t=\t1"
+    result = highlight_code(
+        code_string=code, language="python", tab_width=4, dedent=True
+    )
+    plain = get_plain_lines(result)
+
+    assert len(result.lines) == 1
+    assert "\t" not in plain[0]
+    assert plain == ["x   =   1"]
+
+
+def test_dedent_False():
+    code = "\tx\t=\t1"
+    result = highlight_code(
+        code_string=code, language="python", tab_width=4, dedent=False
+    )
     plain = get_plain_lines(result)
 
     assert len(result.lines) == 1
