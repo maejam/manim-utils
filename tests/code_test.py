@@ -6,9 +6,9 @@ from manim import ManimColor
 from manim_utils import highlight_code
 
 
-# # ----------------------------------------------------------------------
-# # Setup
-# # ----------------------------------------------------------------------
+# ----------------------------------------------------------------------
+# Setup
+# ----------------------------------------------------------------------
 def strip_pango_tags(text):
     """Remove Pango markup tags to get plain text for assertions."""
     # Remove the outer wrapper and the leading dot.
@@ -211,7 +211,7 @@ def test_special_characters_in_string():
     """Test strings with special characters that might break Pango."""
     code = r'''"""<script>alert('x')</script>
 Line 2"""'''
-    result = highlight_code(code_string=code, language="javascript")
+    result = highlight_code(code_string=code, language="python")
 
     # Should not crash and should preserve the text
     assert result is not None
@@ -276,3 +276,21 @@ def test_dedent_False():
     assert len(result.lines) == 1
     assert "\t" not in plain[0]
     assert plain == ["    x   =   1"]
+
+
+def test_console_output():
+    code = """(venv) user@host:~/dir$ ls -la
+total 2
+drwxrwxr-x  8 mj mj   4096 avril 30 00:32 .
+drwxrwxr-x 24 mj mj   4096 mars  17 14:45 ..
+    """
+    result = highlight_code(code_string=code, language="console")
+    plain = get_plain_lines(result)
+    assert len(result.lines) == 4
+    assert plain == [
+        "(venv) user@host:~/dir$ ls -la",
+        "total 2",
+        "drwxrwxr-x  8 mj mj   4096 avril 30 00:32 .",
+        "drwxrwxr-x 24 mj mj   4096 mars  17 14:45 ..",
+    ]
+    print(plain)
