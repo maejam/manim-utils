@@ -87,6 +87,14 @@ def highlight_code(
     ...         print(code.bgcolor type(code.bgcolor))
     #FBF1C7 <class 'manim.utils.color.core.ManimColor'>
 
+    Note on performance
+    --------------------
+    MarkupText is the bottleneck here and is inherently slow. Multi-threading and batch
+    processing (building one big MarkupText instead of one per line) actually degrade
+    performance. Even Text or Paragraph take only 25% less time to render 120 lines
+    with no highlighting (they scale much better though but who needs to animate
+    thousands of lines??). Code is 120% slower on 60 lines and breaks with 120.
+
     """
     lexer = get_lexer_by_name(language) if language is not None else None
     if code_file is not None:
