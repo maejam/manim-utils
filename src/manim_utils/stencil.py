@@ -4,6 +4,8 @@ from typing import Any
 import manim as m
 from manim.utils.unit import Pixels
 
+from manim_utils import get_bounds
+
 
 class Stencil(m.VMobject):
     """A VMobject that represents the Boolean combination of a shape and a clip.
@@ -64,9 +66,8 @@ class Stencil(m.VMobject):
         """Keep the stencil aligned with the wrapped Mobject."""
         if self._wrapped is None:
             return
-        r = m.SurroundingRectangle(
-            self._wrapped, buff=self._wrapped.stroke_width / 200 + 2 * Pixels
-        )
+        w, h, _, center = get_bounds(self._wrapped, as_len=True, include_stroke=True)
+        r = m.Rectangle(width=w + 2 * Pixels, height=h + 2 * Pixels).move_to(center)
         self._shape.match_points(r)
         self._make_stencil()
 
