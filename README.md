@@ -11,6 +11,7 @@
     - [Buttons](#Buttons)
     - [Cursor](#Cursor)
   - [groups](#groups)
+  - [geometry](#geometry)
 
 ---
 
@@ -361,4 +362,89 @@ class IconTextDemo(Scene):
 ```
 
 * `VIconText`: similar to `IconText`, but does not accept raster images as icons. Can be used in a vectorized context though, which makes it suitable as a `Button` content for instance.  
+
+
+### Geometry  
+
+* `get_bounds`: a function that returns the bounding box a (groupof) mobject(s). It can include the stroke in the bounding box or not, and has 2 return values conventions based on the `·has_len` parameter:
+ - if False (default), it returns 3 3D-points (lower-left, center, upper-right), ideal to perform bounding box computations.
+ - if True, it returns the length of each side of the bounding box + the center point, ideal to build a surrounding rectangle (and much faster than `manim.SurroundingRectangle`).
+
+ ```python
+
+
+from manim import *
+from manim_utils import get_bounds
+
+
+class GetBoundsDemo(Scene):
+    def construct(self):
+        square = Square(side_length=2)
+        d = Dot().shift(LEFT * 2)
+        min_pt, center_pt, max_pt = get_bounds(square)
+        is_left_of_bbox = d.get_x() < min_pt[0]
+        width, height, depth, center = get_bounds(
+            square, as_len=True, include_stroke=True
+        )
+        surrounding = Rectangle(width=width, height=height, color=RED).move_to(center)
+
+        self.add(square, d, surrounding)
+        print(is_left_of_bbox) # True
+
+```  
+
+* `is_inside_bounds`: a function built on top of `get_bounds` to ease checking if a Mobject is inside the bounding box of another/others. The `strict` parameter controls whether the object should be fully inside the bounds or not for the function to return True, and the `include_stroke` parameter controls whether the stroke is part of the target bounding box or not.  
+
+* `clip_vmobject`: a function built on top of the 2 previous functions making it possible to clip a subject vmobject with another. It is mainly meant to be used with complex objects and VGroup. It is a bit slower than `manim.Intersection` for simple shapes but scales much better for complex shapes such as `Text` for instance. Unlike Intersection, it also preserves the style of the subject.
+
+```python
+
+import time
+
+from manim import *
+
+from manim_utils import clip_vmobject
+
+
+class ClipVMobjectDemo(Scene):
+    def construct(self) -> None:
+        square = Square()
+        circle = Circle().scale(1.2)
+
+        t1 = time.perf_counter()
+        intersect = Intersection(circle, square)
+        t2 = time.perf_counter()
+        self.add(intersect.shift(LEFT))
+
+        t3 = time.perf_counter()
+        # unlike Intersection, order matters and the style is preserved
+        clip = clip_vmobject(circle, square)
+        t4 = time.perf_counter()
+        self.add(clip.shift(RIGHT))
+
+        txt = Text("abcdefghijklmnopqrstuvwxyx")
+        txt[11].set_fill(BLUE)
+        txt[12].set_fill(RED)
+        txt[13].set_fill(GREEN)
+        txt[14].set_fill(YELLOW)
+        txt[15].set_fill(ORANGE)
+
+        t5 = time.perf_counter()
+        intersect2 = VGroup()
+        intersect2.add(Intersection(letter, square) for letter in txt)
+        t6 = time.perf_counter()
+        self.add(intersect2.shift(UP * 2))
+
+        t7 = time.perf_counter()
+        clip2 = clip_vmobject(txt, square)
+        t8 = time.perf_counter()
+        self.add(clip2.shift(DOWN * 2))
+
+        print(f"Intersection on simple shapes: {t2 - t1:.5f}s")
+        print(f"Clipping on simple shapes: {t4 - t3:.5f}s")
+        print(f"Intersection on text: {t6 - t5:.5f}s")
+        print(f"Clipping on text: {t8 - t7:.5f}s")
+
+```
+
 
