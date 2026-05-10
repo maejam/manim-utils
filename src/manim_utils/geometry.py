@@ -1,3 +1,4 @@
+import functools
 from typing import Literal, cast, overload
 
 import manim as m
@@ -20,6 +21,7 @@ def get_bounds(
 ) -> tuple[float, float, float, Point3D]: ...
 
 
+@functools.cache
 def get_bounds(
     *vmobjects: m.VMobject, as_len: bool = False, include_stroke: bool | None = None
 ) -> tuple[Point3D, Point3D, Point3D] | tuple[float, float, float, Point3D]:
@@ -205,10 +207,83 @@ def is_inside_bounds(
     if strict:
         mask1 = is_ge(mob_min_pt, min_pt)
         mask2 = is_le(mob_max_pt, max_pt)
-        print(mask2)
 
     else:
         mask1 = is_ge(mob_max_pt, min_pt)
         mask2 = is_le(mob_min_pt, max_pt)
 
     return bool(np.all(mask1 & mask2))
+
+
+def clip_vmobject(
+    subject: m.VMobject,
+    clipper: m.VMobject,
+    strict: bool = False,
+) -> m.VGroup:
+    """Clip a subject VMobject by a clipper VMobject.
+
+    This function computes the intersection between 2 VMobjects: the subject and the
+    clipper. It is primarily meant to be used with Text-like Mobjects.
+
+    It is superior to the built-in :class:`manim.Intersection` in 4 ways:
+     - it accepts directly composite vmobjects such as VGroup or Text.
+     - style preserving: the style of the subject is preserved.
+     - it scales much better for complex vmobjects with many submobjects. Though it is
+       a bit slower for simple shapes.
+     - submobjects that intersect the clipper can be discarded with strict=True.
+
+    Parameters
+    ----------
+    subject
+        The VMobject to clip.
+    clipper
+        The VMobject by which to clip the subject.
+    strict
+        If True, only keep the submobjects that are fully inside the clipper bounds.
+        If False (default), keep the points of the submobjects intersecting the clipper
+        that are inside it.
+
+    Returns
+    -------
+    A VGroup containing all the subject's family members with points flattened.
+    Those of the family members that intersect with the clipper are discarded if
+    strict=True and are Intersection objects with strict=False.
+    If the clipper does not have any points, a flattened VGroup containing all the
+    family members with points is returned.
+
+    Notes
+    -----
+     - Only the inside of the clipper stroke is considered: a vmobject touching
+       the stroke of the clipper is considered to be outside of it.
+     - Unlike Intersection, the order matters here:
+       (clip_vmobject(square, circle) != clip_vmobject(circle, square)).
+
+    """
+    clipper_family = clipper.family_members_with_points()
+    if not clipper_family:
+        return m.VGroup(
+            *(child.copy() for child in subject.family_members_with_points())
+        )
+
+    result_group = m.VGroup()
+
+    for child in subject.family_members_with_points():
+        # if child fully inside clipper: keep it
+        if is_inside_bounds(child, *clipper_family, strict=True, include_stroke=False):
+            result_group.add(child.copy())
+            continue
+
+        # if child fully outside: drop it
+        if not is_inside_bounds(
+            child, *clipper_family, strict=False, include_stroke=False
+        ):
+            continue
+
+        # if we are here, child is partially inside: drop it or crop it
+        if strict:
+            continue
+        cropped_child = m.Intersection(child, *clipper_family).match_style(child)
+        if len(cropped_child.points) > 0:
+            result_group.add(cropped_child)
+
+    return result_group

@@ -3,6 +3,7 @@ from .animations import LazyAnimation as LazyAnimation
 from .animations import TrackedAnimationMixin as TrackedAnimationMixin
 from .code import get_styles_list as get_styles_list
 from .code import highlight_code as highlight_code
+from .geometry import clip_vmobject as clip_vmobject
 from .geometry import get_bounds as get_bounds
 from .geometry import is_inside_bounds as is_inside_bounds
 from .groups import GroupDict as GroupDict

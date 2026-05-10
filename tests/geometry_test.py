@@ -1,7 +1,8 @@
 import manim as m
 import numpy as np
+import pytest
 
-from manim_utils.geometry import get_bounds, is_inside_bounds
+from manim_utils.geometry import clip_vmobject, get_bounds, is_inside_bounds
 
 
 # ----------------------------------------------------------------------
@@ -20,10 +21,30 @@ def create_test_objects():
     # A line from (0, 2, 0) to (0, 3, 0)
     line = m.Line(np.array([0, 2, 0]), np.array([0, 3, 0]))
 
-    # objects for is_inside_bounds
     small_square = m.Square(side_length=1).move_to(m.ORIGIN)
 
     return square, circle, line, small_square
+
+
+@pytest.fixture
+def text_object():
+    """A simple text object"""
+    return m.Text("CLIPPING TEST", font_size=24).move_to(m.ORIGIN)
+
+
+@pytest.fixture
+def composite_object():
+    """A VGroup with a line and a square"""
+    triangle = m.Triangle().scale(2)
+    square = m.Square(side_length=1)
+    group = m.VGroup(triangle, square)
+    return group
+
+
+@pytest.fixture
+def empty_clipper():
+    """A clipper with no points"""
+    return m.VGroup()
 
 
 # ----------------------------------------------------------------------
@@ -407,3 +428,120 @@ def test_empty_vmobjects_list():
     """Should handle empty vmobjects list gracefully"""
     square, circle, line, small_square = create_test_objects()
     assert is_inside_bounds(small_square) is False
+
+
+# ----------------------------------------------------------------------
+# clip_vmobject
+# ----------------------------------------------------------------------
+def test_primitive_fully_inside():
+    """A small circle fully inside a large square should return a copy"""
+    square, circle, line, small_square = create_test_objects()
+    result = clip_vmobject(small_square, square, strict=False)
+
+    assert len(result) == 1
+    # Check that the result is a copy (different object id) but same geometry
+    assert result[0] is not small_square
+    assert isinstance(result[0], m.Square)
+    # Approximate check for radius and position
+    assert np.allclose(result[0].get_center(), [0, 0, 0], atol=1e-5)
+    assert small_square.side_length == result[0].side_length
+
+
+def test_primitive_fully_outside():
+    """Move circle far outside; result should be empty"""
+    square, circle, line, small_square = create_test_objects()
+    result = clip_vmobject(circle, small_square, strict=False)
+    assert len(result) == 0
+
+
+def test_primitive_partial_intersection():
+    """A circle partially intersecting the clipper should be cropped"""
+    square, circle, line, small_square = create_test_objects()
+    small_square.shift(m.RIGHT)
+    result = clip_vmobject(small_square, square, strict=False)
+
+    # Should have at least one part (the intersection)
+    assert len(result) == 1
+    assert isinstance(result[0], m.Intersection)
+
+
+def test_primitive_strict_mode_fully_inside():
+    """Strict mode: fully inside should be kept"""
+    square, circle, line, small_square = create_test_objects()
+    result = clip_vmobject(small_square, square, strict=True)
+    assert len(result) == 1
+
+
+def test_primitive_strict_mode_partial():
+    """Strict mode: partially intersecting should be dropped"""
+    square, circle, line, small_square = create_test_objects()
+    result = clip_vmobject(small_square.shift(m.RIGHT), square, strict=True)
+    assert len(result) == 0
+
+
+def test_text_object_fully_inside(text_object):
+    """Text fully inside should return all letters"""
+    square, circle, line, small_square = create_test_objects()
+    # Move text to center
+    result = clip_vmobject(text_object, square.scale(2), strict=False)
+
+    # Text is composed of letters. All should be present.
+    assert len(result) == len(text_object)
+    assert all(isinstance(obj, m.VMobjectFromSVGPath) for obj in result)
+
+
+def test_text_object_partial_intersection(text_object):
+    """Text partially intersecting: letters inside kept, letters outside dropped,
+    intersecting letters cropped"""
+    square, circle, line, small_square = create_test_objects()
+    text_shifted = text_object.move_to((1, 0, 0))
+
+    result = clip_vmobject(text_shifted, square, strict=False)
+
+    # text is cropped on N (clippiN)
+    assert len(result) == 7
+    assert all(isinstance(obj, m.VMobjectFromSVGPath) for obj in result[:-1])
+    assert isinstance(result[-1], m.Intersection)
+
+    result_strict = clip_vmobject(text_shifted, square, strict=True)
+    assert len(result_strict) == 6
+    assert all(isinstance(obj, m.VMobjectFromSVGPath) for obj in result_strict)
+
+
+def test_composite_object_partial(composite_object):
+    """VGroup with triangle and square: triangle crosses, square is inside"""
+    square, circle, line, small_square = create_test_objects()
+    result = clip_vmobject(composite_object, square, strict=False)
+
+    # Should have the square (fully inside) and the cropped triangle
+    assert len(result) == 2
+    assert isinstance(result[0], m.Intersection)
+    assert isinstance(result[1], m.Square)
+
+
+def test_composite_object_strict(composite_object):
+    """Strict mode on composite: only fully inside parts kept"""
+    square, circle, line, small_square = create_test_objects()
+    result = clip_vmobject(composite_object, square, strict=True)
+
+    assert len(result) == 1
+    assert isinstance(result[0], m.Square)
+
+
+def test_empty_clipper(empty_clipper):
+    """Clipping with an empty clipper should return empty VGroup"""
+    result = clip_vmobject(c := m.Circle(), empty_clipper)
+    assert len(result) == 1
+    assert isinstance(result[0], m.Circle)
+    assert result[0] is not c
+
+
+def test_touching_boundary():
+    """Object touching the boundary exactly"""
+    square, circle, line, small_square = create_test_objects()
+    small_square.shift(m.RIGHT * 0.5)
+    result = clip_vmobject(small_square, square, strict=False)
+    assert len(result) == 1
+    assert isinstance(result[0], m.Intersection)
+    result = clip_vmobject(small_square, square, strict=True)
+    assert len(result) == 0
