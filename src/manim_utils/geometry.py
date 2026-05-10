@@ -3,6 +3,7 @@ from typing import Literal, cast, overload
 import manim as m
 import numpy as np
 from manim.typing import Point3D
+from numpy.typing import NDArray
 
 
 @overload
@@ -185,12 +186,29 @@ def is_inside_bounds(
     min_pt, _, max_pt = get_bounds(
         *vmobjects, as_len=False, include_stroke=include_stroke
     )
+
+    # apply a tolerance to inequalities for floating point errors
+    rtol: float = 1e-5
+    atol: float = 1e-8
+
+    def is_ge(a: NDArray[np.float64], b: NDArray[np.float64]) -> NDArray[np.bool_]:
+        # Calculate the allowed negative deviation
+        # This mimics the logic inside np.isclose: |a-b| <= atol + rtol*|b|
+        # We want to accept if (a-b) is slightly negative but within tolerance
+        tolerance = atol + rtol * np.abs(b)
+        return (a - b) >= -tolerance
+
+    def is_le(a: NDArray[np.float64], b: NDArray[np.float64]) -> NDArray[np.bool_]:
+        tolerance = atol + rtol * np.abs(b)
+        return (b - a) >= -tolerance
+
     if strict:
-        mask1 = mob_min_pt >= min_pt
-        mask2 = mob_max_pt <= max_pt
+        mask1 = is_ge(mob_min_pt, min_pt)
+        mask2 = is_le(mob_max_pt, max_pt)
+        print(mask2)
 
     else:
-        mask1 = mob_max_pt >= min_pt
-        mask2 = mob_min_pt <= max_pt
+        mask1 = is_ge(mob_max_pt, min_pt)
+        mask2 = is_le(mob_min_pt, max_pt)
 
-    return all(mask1 & mask2)
+    return bool(np.all(mask1 & mask2))
