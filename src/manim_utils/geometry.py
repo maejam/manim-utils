@@ -1,4 +1,3 @@
-import functools
 from typing import Literal, cast, overload
 
 import manim as m
@@ -21,7 +20,6 @@ def get_bounds(
 ) -> tuple[float, float, float, Point3D]: ...
 
 
-@functools.cache
 def get_bounds(
     *vmobjects: m.VMobject, as_len: bool = False, include_stroke: bool | None = None
 ) -> tuple[Point3D, Point3D, Point3D] | tuple[float, float, float, Point3D]:
@@ -156,6 +154,7 @@ def get_bounds(
 def is_inside_bounds(
     mobject: m.Mobject,
     *vmobjects: m.VMobject,
+    bounds: tuple[Point3D, Point3D, Point3D] | None = None,
     strict: bool = True,
     include_stroke: bool | None = None,
 ) -> bool:
@@ -170,6 +169,11 @@ def is_inside_bounds(
         The mobject to check.
     *vmobjects
         One or more VMobjects defining the target bounding box.
+    bounds
+        Alternatively, a 3-tuple containing the result of `get_bounds` with
+        `as_len=False` can be passed. If passed, these values will be used for the
+        `vmobjects` bounds. Useful for performance when checking multiple mobjects
+        against the same bounds.
     strict
         - If True (default): checks if the mobject is fully contained within the bounds.
         - If False: checks if the mobject overlaps with the bounds.
@@ -185,9 +189,12 @@ def is_inside_bounds(
     points = mobject.get_all_points()
     mob_min_pt = np.min(points, axis=0)
     mob_max_pt = np.max(points, axis=0)
-    min_pt, _, max_pt = get_bounds(
-        *vmobjects, as_len=False, include_stroke=include_stroke
-    )
+    if bounds:
+        min_pt, _, max_pt = bounds
+    else:
+        min_pt, _, max_pt = get_bounds(
+            *vmobjects, as_len=False, include_stroke=include_stroke
+        )
 
     # apply a tolerance to inequalities for floating point errors
     rtol: float = 1e-5
@@ -265,17 +272,20 @@ def clip_vmobject(
             *(child.copy() for child in subject.family_members_with_points())
         )
 
+    clipper_bounds = get_bounds(clipper, as_len=False, include_stroke=False)
     result_group = m.VGroup()
 
     for child in subject.family_members_with_points():
         # if child fully inside clipper: keep it
-        if is_inside_bounds(child, *clipper_family, strict=True, include_stroke=False):
+        if is_inside_bounds(
+            child, bounds=clipper_bounds, strict=True, include_stroke=False
+        ):
             result_group.add(child.copy())
             continue
 
         # if child fully outside: drop it
         if not is_inside_bounds(
-            child, *clipper_family, strict=False, include_stroke=False
+            child, bounds=clipper_bounds, strict=False, include_stroke=False
         ):
             continue
 
