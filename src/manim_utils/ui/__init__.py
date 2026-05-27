@@ -1,3 +1,4 @@
+from .buttons import Button as Button
 from .buttons import ButtonDict as ButtonDict
 from .buttons import ButtonGroup as ButtonGroup
 from .buttons import HighlightButton as HighlightButton
